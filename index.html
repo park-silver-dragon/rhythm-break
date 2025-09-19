@@ -4,9 +4,29 @@
   <meta charset="UTF-8">
   <title>리듬게임</title>
   <style>
-    body { text-align: center; font-family: sans-serif; margin-top: 100px; }
-    button { font-size: 20px; margin: 10px; padding: 10px 20px; }
-  </style>
+  :root { --max-width: 900px; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 16px;
+  }
+  h1 { margin: 12px 0 8px; font-size: clamp(18px, 4vw, 28px); }
+  .bar { width: 100%; max-width: var(--max-width); display:flex; justify-content:center; gap:12px; margin-bottom: 12px; }
+  button { font-size: clamp(14px, 3.8vw, 18px); padding: 10px 16px; border-radius: 10px; border: 1px solid #ccc; background:#fff; }
+  #content { width: 100%; max-width: var(--max-width); }
+  /* 캔버스는 모바일 우선: 폭 가득, 높이는 비율 유지(600:400=3:2) */
+  canvas {
+    width: 100%;
+    /* 화면이 너무 높게 차지하지 않도록 상한: 모바일 70vh, 데스크탑 60vh */
+    max-height: 70vh;
+    display: block; margin: 0 auto; border: 1px solid #000;
+    touch-action: manipulation;
+  }
+  p { margin: 8px 0; font-size: clamp(14px, 3.6vw, 16px); text-align:center; }
+</style>
+
 </head>
 <body>
   <h1>🎵 리듬게임 🎵</h1>
@@ -16,60 +36,141 @@
   <div id="content"></div>
 
 <script>
-  let gameArea;
+  // ====== 전역 상태 ======
+  let gameArea, ctx;
   let score = 0;
   let circles = [];
   let gameInterval;
+
+  // 논리 좌표(디자인 해상도) — 게임 로직은 이 좌표계를 기준으로만 동작
+  const DESIGN_W = 600;
+  const DESIGN_H = 400;
 
   // 판정 상수
   const TARGET = 70;
   const PERFECT_MIN = 60;
   const PERFECT_MAX = 80;
 
-  // 🔄 게임 화면 업데이트 (가이드 포함)
-  function updateGame(ctx) {
-    ctx.clearRect(0, 0, gameArea.width, gameArea.height);
+  // 뷰(스크린 스케일/오프셋) 상태
+  const view = {
+    cssW: 0, cssH: 0,        // CSS 픽셀(보이는 크기)
+    dpr: 1,                  // 디바이스 픽셀 비율
+    scale: 1,                // 논리좌표→화면 스케일
+    offsetX: 0, offsetY: 0   // 레터박스 보정
+  };
 
+  // ====== 리사이즈 & 스케일링 ======
+  function resizeCanvas() {
+    if (!gameArea || !ctx) return;
+
+    // 1) CSS 크기 결정 (모바일 우선)
+    // 폭은 컨테이너 가득, 높이는 3:2 비율 유지. 단, 70vh(모바일)/60vh(데스크탑) 상한.
+    const container = gameArea.parentElement;
+    const containerW = container.clientWidth;
+
+    const aspect = DESIGN_H / DESIGN_W; // 400/600 = 0.666...
+    let cssW = containerW;
+    let cssH = Math.round(cssW * aspect);
+
+    const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+    const maxH = (window.innerWidth < 768) ? Math.round(vh * 0.70) : Math.round(vh * 0.60);
+    if (cssH > maxH) {
+      cssH = maxH;
+      cssW = Math.round(cssH / aspect);
+    }
+
+    view.cssW = cssW;
+    view.cssH = cssH;
+
+    // 2) 실제 캔버스 픽셀 크기 (DPR 반영, 레티나 선명도)
+    const dpr = window.devicePixelRatio || 1;
+    view.dpr = dpr;
+    gameArea.style.width = cssW + "px";
+    gameArea.style.height = cssH + "px";
+    gameArea.width = Math.round(cssW * dpr);
+    gameArea.height = Math.round(cssH * dpr);
+
+    // 3) 논리좌표 → 화면 스케일/오프셋 계산 (레터박스 대응)
+    const scaleX = cssW / DESIGN_W;
+    const scaleY = cssH / DESIGN_H;
+    view.scale = Math.min(scaleX, scaleY);
+    view.offsetX = (cssW - DESIGN_W * view.scale) / 2;
+    view.offsetY = (cssH - DESIGN_H * view.scale) / 2;
+
+    // 4) 좌표계 적용
+    applyViewTransform();
+    // 프레임 즉시 갱신(깜빡임 방지)
+  }
+
+  function applyViewTransform() {
+    // 화면 픽셀 좌표계로 초기화 후, DPR+스케일+오프셋 적용
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // 전체 클리어는 updateGame에서 수행
+    // 변환 적용: (스케일*DPR)과 (오프셋*DPR)
+    ctx.setTransform(view.scale * view.dpr, 0, 0, view.scale * view.dpr,
+                     view.offsetX * view.dpr, view.offsetY * view.dpr);
+  }
+
+  function clearFrame() {
+    // 화면 픽셀 기준으로 완전 클리어
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, gameArea.width, gameArea.height);
+    ctx.restore();
+    // 다시 논리좌표 변환 적용
+    applyViewTransform();
+  }
+
+  // ====== 게임 루프 ======
+  function updateGame() {
+    clearFrame();
+
+    // 선 두께/글꼴을 논리좌표 기준으로 일정하게 보이게 조정(옵션)
+    // 화면 스케일이 커질수록 실제 화면 px 선두께가 두꺼워지니 보정
+    const lw = 1 / view.scale; // 논리 1px 느낌
+    ctx.lineWidth = lw;
+    ctx.font = `${Math.max(10, Math.floor(12 / view.scale))}px sans-serif`;
+
+    // 원 업데이트 & 그리기
     circles.forEach(c => {
       c.radius += 1; // 속도 그대로
+
       // 원 (검정 실선)
       ctx.beginPath();
-      ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
-      ctx.strokeStyle = "black";
       ctx.setLineDash([]);
+      ctx.strokeStyle = "black";
+      ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
       ctx.stroke();
 
       // 반지름 표기
-      ctx.fillText("r=" + Math.floor(c.radius), c.x + c.radius + 5, c.y);
+      ctx.fillText("r=" + Math.floor(c.radius), c.x + c.radius + 6, c.y);
     });
 
-    // 🎯 가이드: 퍼펙트 존(60~80) 테두리 + 중앙 타겟(70)
-    // 1) 퍼펙트 경계 60, 80 (초록 점선)
+    // 가이드: 퍼펙트 범위(60,80) + 타깃(70)
+    // 퍼펙트 경계(초록 점선)
+    ctx.setLineDash([6 / view.scale, 6 / view.scale]);
+    ctx.strokeStyle = "green";
+
     ctx.beginPath();
     ctx.arc(300, 200, PERFECT_MIN, 0, Math.PI * 2);
-    ctx.strokeStyle = "green";
-    ctx.setLineDash([4, 4]);
     ctx.stroke();
 
     ctx.beginPath();
     ctx.arc(300, 200, PERFECT_MAX, 0, Math.PI * 2);
     ctx.stroke();
 
-    // 2) 중앙 타겟 70 (빨간 점선)
+    // 타깃(빨간 점선)
+    ctx.setLineDash([10 / view.scale, 7 / view.scale]);
+    ctx.strokeStyle = "red";
     ctx.beginPath();
     ctx.arc(300, 200, TARGET, 0, Math.PI * 2);
-    ctx.strokeStyle = "red";
-    ctx.setLineDash([6, 4]);
     ctx.stroke();
 
-    // 복원
-    ctx.setLineDash([]);
-    ctx.strokeStyle = "black";
-
-    requestAnimationFrame(() => updateGame(ctx));
+    // 다음 프레임
+    requestAnimationFrame(updateGame);
   }
 
-  // ✅ 판정 체크
+  // ====== 입력 ======
   function checkHit(event) {
     if (event.code !== "Space") return;
     if (circles.length === 0) return;
@@ -78,12 +179,10 @@
     const r = c.radius;
     let gained = 0;
 
-    // 최대 점수 조건: 60 < r < 80
     if (r > PERFECT_MIN && r < PERFECT_MAX) {
-      gained = 100;
+      gained = 100;                // 60 < r < 80
     } else if (Math.abs(r - TARGET) < 25) {
-      // 세컨드 보상: 타겟에서 ±25 이내
-      gained = 50;
+      gained = 50;                 // 타겟 ±25
     } else {
       gained = 10;
     }
@@ -93,36 +192,49 @@
     circles.shift(); // 사용한 원 제거
   }
 
-  // 시작 버튼 클릭 시
+  // ====== 화면 구성 ======
   function startGame() {
     document.getElementById("content").innerHTML = `
       <p>학번: <input id="studentId"></p>
       <p>이름: <input id="name"></p>
-      <button onclick="gameStart()">입력 완료</button>
+      <div class="bar"><button onclick="gameStart()">입력 완료</button></div>
     `;
   }
 
-  // 입력 완료 후 게임 시작
   function gameStart() {
-    const id = document.getElementById("studentId").value;
-    const name = document.getElementById("name").value;
+    const id = (document.getElementById("studentId").value || "").trim();
+    const name = (document.getElementById("name").value || "").trim();
 
     document.getElementById("content").innerHTML = `
-      <canvas id="gameCanvas" width="600" height="400" style="border:1px solid black;"></canvas>
+      <canvas id="gameCanvas"></canvas>
       <p>점수: <span id="score">0</span></p>
       <p>${id} ${name} 님, 음악에 맞춰 키를 눌러보세요! (스페이스바)</p>
     `;
 
     gameArea = document.getElementById("gameCanvas");
-    const ctx = gameArea.getContext("2d");
+    ctx = gameArea.getContext("2d");
 
-    gameInterval = setInterval(createCircle, 2000); // 속도 그대로(2초마다 생성)
-    requestAnimationFrame(() => updateGame(ctx));
-    document.addEventListener("keydown", checkHit);
+    // 초기 원 생성 주기(2초)
+    gameInterval = setInterval(createCircle, 2000);
+
+    // 리사이즈 적용 및 루프 시작
+    resizeCanvas();
+    requestAnimationFrame(updateGame);
+
+    // 입력 등록
+    document.addEventListener("keydown", checkHit, { passive: true });
+
+    // 창 크기/회전 변경 시 반응
+    window.addEventListener("resize", resizeCanvas);
+    window.addEventListener("orientationchange", () => {
+      // 모바일 회전 즉시 반영
+      setTimeout(resizeCanvas, 50);
+    });
   }
 
-  // 원 생성 함수
+  // ====== 데이터 ======
   function createCircle() {
+    // 논리좌표 기준 중앙
     circles.push({ x: 300, y: 200, radius: 10 });
   }
 
@@ -133,6 +245,8 @@
 </script>
 
 
+
 </body>
 </html>
+
 
