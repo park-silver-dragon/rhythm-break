@@ -219,6 +219,9 @@
         ctx.fillText("r=" + Math.floor(c.radius), c.x + c.radius + 6, c.y);
       });
 
+      circles = circles.filter(c => c.radius <= 120);
+
+
       // 퍼펙트 범위(초록 점선)
       ctx.setLineDash([6 / view.scale, 6 / view.scale]);
       ctx.strokeStyle = "green";
@@ -293,3 +296,4 @@
   </script>
 </body>
 </html>
+
