@@ -1,322 +1,295 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta charset="UTF-8">
   <title>리듬게임</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <style>
-  :root { --max-width: 900px; }
+    :root { --max-width: 900px; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-text-size-adjust: 100%;
+      background: #fff;
+    }
+    body { display: flex; flex-direction: column; align-items: center; padding: 16px; }
 
-  * { box-sizing: border-box; }
+    /* 타이틀 크게 */
+    h1 {
+      margin: 12px 0 10px; line-height: 1.2; font-weight: 800;
+      font-size: clamp(24px, 7vw, 40px); letter-spacing: -0.02em; text-align: center;
+    }
 
-  html, body {
-    margin: 0;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    -webkit-text-size-adjust: 100%;
-  }
+    /* 공용 바 */
+    .bar {
+      width: 100%; max-width: var(--max-width);
+      display: flex; justify-content: center; gap: 12px;
+    }
 
-  body {
-    display: flex; flex-direction: column; align-items: center;
-    padding: 16px;
-    background: #fff;
-  }
+    /* 메인 메뉴: 좌우 배치 + 동일 폭 */
+    .bar.menu { flex-wrap: nowrap; }
+    .bar.menu > button { flex: 1 1 0; min-width: 0; }
 
-  /* ✅ 타이틀 크게: 모바일에서도 확실히 보이게 */
-  h1 {
-    margin: 12px 0 10px;
-    line-height: 1.2;
-    font-weight: 800;
-    font-size: clamp(24px, 7vw, 40px);
-    letter-spacing: -0.02em;
-  }
+    /* 버튼 크게 + 터치 타깃 확보 */
+    button {
+      font-size: clamp(16px, 4.5vw, 18px);
+      padding: 14px 18px; min-height: 48px;
+      border-radius: 12px; border: 1px solid #d0d0d0; background:#fff;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.06); cursor: pointer;
+    }
+    button:active { transform: translateY(1px); }
 
-  /* 버튼/입력창 컨테이너 */
-  .bar { width: 100%; max-width: var(--max-width); display:flex; justify-content:center; gap:12px; flex-wrap: wrap; margin-bottom: 12px; }
+    /* 컨텐츠 영역 */
+    #content { width: 100%; max-width: var(--max-width); margin-top: 12px; }
 
-  /* ✅ 버튼 크게 + 터치 타깃 확보(최소 44px 높이) */
-  button {
-    font-size: clamp(16px, 4.5vw, 18px);
-    padding: 14px 18px;
-    min-height: 48px;
-    border-radius: 12px;
-    border: 1px solid #d0d0d0;
-    background:#ffffff;
-    box-shadow: 0 1px 0 rgba(0,0,0,0.06);
-  }
+    /* 입력 UI */
+    .input-row { display:flex; align-items:center; justify-content:center; gap:10px; margin: 10px 0; }
+    label { font-size: clamp(15px, 4.2vw, 17px); }
+    input[type="text"] {
+      font-size: clamp(16px, 4.8vw, 18px);
+      padding: 12px 14px; min-height: 48px;
+      width: min(420px, 80vw);
+      border: 1.2px solid #cfcfcf; border-radius: 10px; background: #fff;
+    }
 
-  button:active { transform: translateY(1px); }
+    /* 본문 텍스트 */
+    p { margin: 10px 0; font-size: clamp(15px, 4.2vw, 17px); text-align:center; }
 
-  /* 컨텐츠 폭 */
-  #content { width: 100%; max-width: var(--max-width); }
+    /* 캔버스 반응형 */
+    canvas {
+      width: 100%; max-height: 70vh;
+      display: block; margin: 0 auto; border: 1px solid #000;
+      touch-action: manipulation;
+    }
 
-  /* ✅ 입력창 크게 */
-  .input-row { display:flex; align-items:center; justify-content:center; gap:10px; margin: 10px 0; }
-  label { font-size: clamp(15px, 4.2vw, 17px); }
-  input[type="text"] {
-    font-size: clamp(16px, 4.8vw, 18px);
-    padding: 12px 14px;
-    min-height: 48px;
-    width: min(420px, 80vw);
-    border: 1.2px solid #cfcfcf;
-    border-radius: 10px;
-    background: #fff;
-  }
-
-  /* 본문 텍스트 */
-  p { margin: 10px 0; font-size: clamp(15px, 4.2vw, 17px); text-align:center; }
-
-  /* 캔버스는 그대로 반응형 (이전 단계 유지) */
-  canvas {
-    width: 100%;
-    max-height: 70vh; /* 모바일 상한 */
-    display: block; margin: 0 auto; border: 1px solid #000;
-    touch-action: manipulation;
-  }
-
-  /* 데스크탑에서 살짝 줄이기 */
-  @media (min-width: 1024px) {
-    button { padding: 12px 16px; }
-    input[type="text"] { width: 420px; }
-  }
-</style>
-
-
+    @media (min-width: 1024px) {
+      button { padding: 12px 16px; }
+      input[type="text"] { width: 420px; }
+      canvas { max-height: 60vh; }
+    }
+  </style>
 </head>
 <body>
   <h1>🎵 리듬게임 🎵</h1>
-  <button onclick="startGame()">게임 시작</button>
-  <button onclick="showRanking()">랭킹 확인</button>
+
+  <!-- 메인 메뉴: 좌우 배치 -->
+  <div class="bar menu">
+    <button onclick="startGame()">게임 시작</button>
+    <button onclick="showRanking()">랭킹 확인</button>
+  </div>
 
   <div id="content"></div>
 
-<script>
-  // ====== 전역 상태 ======
-  let gameArea, ctx;
-  let score = 0;
-  let circles = [];
-  let gameInterval;
+  <script>
+    // ====== 전역 상태 ======
+    let gameArea, ctx;
+    let score = 0;
+    let circles = [];
+    let gameInterval;
 
-  // 논리 좌표(디자인 해상도)
-  const DESIGN_W = 600;
-  const DESIGN_H = 400;
+    // 논리 좌표(디자인 해상도) — 게임 로직은 이 좌표계를 기준으로만 동작
+    const DESIGN_W = 600;
+    const DESIGN_H = 400;
 
-  // 판정 상수
-  const TARGET = 70;
-  const PERFECT_MIN = 60;
-  const PERFECT_MAX = 80;
+    // 판정 상수
+    const TARGET = 70;
+    const PERFECT_MIN = 60;
+    const PERFECT_MAX = 80;
 
-  // 터치 히트박스 (논리 좌표 기준)
-  const TOUCH_CENTER_X = 300;
-  const TOUCH_CENTER_Y = 200;
-  const TOUCH_HIT_RADIUS = 65; // 요청값
+    // 터치 히트박스 (논리 좌표 기준)
+    const TOUCH_CENTER_X = 300;
+    const TOUCH_CENTER_Y = 200;
+    const TOUCH_HIT_RADIUS = 65;
 
-  // 뷰(스케일 상태)
-  const view = {
-    cssW: 0, cssH: 0,
-    dpr: 1,
-    scale: 1,
-    offsetX: 0, offsetY: 0
-  };
+    // 뷰(스크린 스케일/오프셋) 상태
+    const view = { cssW:0, cssH:0, dpr:1, scale:1, offsetX:0, offsetY:0 };
 
-  // ====== 리사이즈 & 스케일링 ======
-  function resizeCanvas() {
-    if (!gameArea || !ctx) return;
+    // ====== 리사이즈 & 스케일링 ======
+    function resizeCanvas() {
+      if (!gameArea || !ctx) return;
 
-    const container = gameArea.parentElement;
-    const containerW = container.clientWidth;
+      // 1) CSS 크기 결정 (모바일 우선, 3:2 비율)
+      const container = gameArea.parentElement;
+      const containerW = container.clientWidth;
+      const aspect = DESIGN_H / DESIGN_W; // 400/600
+      let cssW = containerW;
+      let cssH = Math.round(cssW * aspect);
 
-    const aspect = DESIGN_H / DESIGN_W; // 400/600
-    let cssW = containerW;
-    let cssH = Math.round(cssW * aspect);
+      const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+      const maxH = (window.innerWidth < 768) ? Math.round(vh * 0.70) : Math.round(vh * 0.60);
+      if (cssH > maxH) { cssH = maxH; cssW = Math.round(cssH / aspect); }
 
-    const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-    const maxH = (window.innerWidth < 768) ? Math.round(vh * 0.70) : Math.round(vh * 0.60);
-    if (cssH > maxH) {
-      cssH = maxH;
-      cssW = Math.round(cssH / aspect);
+      view.cssW = cssW; view.cssH = cssH;
+
+      // 2) 실제 캔버스 픽셀 크기 (DPR 반영)
+      const dpr = window.devicePixelRatio || 1;
+      view.dpr = dpr;
+      gameArea.style.width = cssW + "px";
+      gameArea.style.height = cssH + "px";
+      gameArea.width = Math.round(cssW * dpr);
+      gameArea.height = Math.round(cssH * dpr);
+
+      // 3) 스케일/오프셋 계산
+      const scaleX = cssW / DESIGN_W;
+      const scaleY = cssH / DESIGN_H;
+      view.scale = Math.min(scaleX, scaleY);
+      view.offsetX = (cssW - DESIGN_W * view.scale) / 2;
+      view.offsetY = (cssH - DESIGN_H * view.scale) / 2;
+
+      applyViewTransform();
     }
 
-    view.cssW = cssW;
-    view.cssH = cssH;
-
-    const dpr = window.devicePixelRatio || 1;
-    view.dpr = dpr;
-    gameArea.style.width = cssW + "px";
-    gameArea.style.height = cssH + "px";
-    gameArea.width = Math.round(cssW * dpr);
-    gameArea.height = Math.round(cssH * dpr);
-
-    const scaleX = cssW / DESIGN_W;
-    const scaleY = cssH / DESIGN_H;
-    view.scale = Math.min(scaleX, scaleY);
-    view.offsetX = (cssW - DESIGN_W * view.scale) / 2;
-    view.offsetY = (cssH - DESIGN_H * view.scale) / 2;
-
-    applyViewTransform();
-  }
-
-  function applyViewTransform() {
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.setTransform(view.scale * view.dpr, 0, 0, view.scale * view.dpr,
-                     view.offsetX * view.dpr, view.offsetY * view.dpr);
-  }
-
-  function clearFrame() {
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, gameArea.width, gameArea.height);
-    ctx.restore();
-    applyViewTransform();
-  }
-
-  // ====== 공용 판정 처리 ======
-  function attemptHit() {
-    if (circles.length === 0) return;
-    const c = circles[0];
-    const r = c.radius;
-    let gained = 0;
-
-    if (r > PERFECT_MIN && r < PERFECT_MAX) {
-      gained = 100; // 60 < r < 80
-    } else if (Math.abs(r - TARGET) < 25) {
-      gained = 50;  // 타겟 ±25
-    } else {
-      gained = 10;
+    function applyViewTransform() {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.setTransform(view.scale * view.dpr, 0, 0, view.scale * view.dpr,
+                       view.offsetX * view.dpr, view.offsetY * view.dpr);
     }
 
-    score += gained;
-    document.getElementById("score").innerText = score;
-    circles.shift(); // 사용한 원 제거
-  }
-
-  // ====== 입력: 키보드(PC 테스트용) ======
-  function onKeyDown(e) {
-    if (e.code !== "Space") return;
-    attemptHit(); // 키보드는 히트박스 제한 없음 (요청대로 유지)
-  }
-
-  // ====== 입력: 터치/클릭(모바일 우선) ======
-  function screenToLogical(clientX, clientY) {
-    const rect = gameArea.getBoundingClientRect();
-    const cssX = clientX - rect.left;
-    const cssY = clientY - rect.top;
-    // CSS 픽셀 → 논리 좌표 (오프셋/스케일 반영, DPR은 이미 CSS 좌표로 들어옴)
-    const x = (cssX - view.offsetX) / view.scale;
-    const y = (cssY - view.offsetY) / view.scale;
-    return { x, y };
-  }
-
-  function onPointerDown(e) {
-    // 한 손가락만 판정
-    const { x, y } = screenToLogical(e.clientX, e.clientY);
-    const dx = x - TOUCH_CENTER_X;
-    const dy = y - TOUCH_CENTER_Y;
-    const dist = Math.hypot(dx, dy);
-
-    // 히트박스: 중심에서 r ≤ 65 안쪽일 때만 판정 시도
-    if (dist <= TOUCH_HIT_RADIUS) {
-      attemptHit();
+    function clearFrame() {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, gameArea.width, gameArea.height);
+      ctx.restore();
+      applyViewTransform();
     }
-  }
 
-  // ====== 게임 루프 ======
-  function updateGame() {
-    clearFrame();
+    // ====== 공용 판정 처리 ======
+    function attemptHit() {
+      if (circles.length === 0) return;
+      const c = circles[0];
+      const r = c.radius;
+      let gained = 0;
 
-    const lw = 1 / view.scale;
-    ctx.lineWidth = lw;
-    ctx.font = `${Math.max(10, Math.floor(12 / view.scale))}px sans-serif`;
+      if (r > PERFECT_MIN && r < PERFECT_MAX) {
+        gained = 100;                // 60 < r < 80
+      } else if (Math.abs(r - TARGET) < 25) {
+        gained = 50;                 // 타겟 ±25
+      } else {
+        gained = 10;
+      }
 
-    // 원 업데이트 & 그리기
-    circles.forEach(c => {
-      c.radius += 1; // 속도 그대로
+      score += gained;
+      document.getElementById("score").innerText = score;
+      circles.shift(); // 사용한 원 제거
+    }
+
+    // ====== 입력: 키보드(PC 테스트용) ======
+    function onKeyDown(e) {
+      if (e.code !== "Space") return;
+      attemptHit(); // 키보드는 히트박스 제한 없음
+    }
+
+    // ====== 입력: 터치/클릭(모바일 우선) ======
+    function screenToLogical(clientX, clientY) {
+      const rect = gameArea.getBoundingClientRect();
+      const cssX = clientX - rect.left;
+      const cssY = clientY - rect.top;
+      const x = (cssX - view.offsetX) / view.scale;
+      const y = (cssY - view.offsetY) / view.scale;
+      return { x, y };
+    }
+
+    function onPointerDown(e) {
+      const { x, y } = screenToLogical(e.clientX, e.clientY);
+      const dx = x - TOUCH_CENTER_X;
+      const dy = y - TOUCH_CENTER_Y;
+      const dist = Math.hypot(dx, dy);
+      if (dist <= TOUCH_HIT_RADIUS) attemptHit();
+    }
+
+    // ====== 게임 루프 ======
+    function updateGame() {
+      clearFrame();
+
+      // 선/폰트 보정
+      const lw = 1 / view.scale;
+      ctx.lineWidth = lw;
+      ctx.font = `${Math.max(10, Math.floor(12 / view.scale))}px sans-serif`;
+
+      // 원 업데이트 & 그리기
+      circles.forEach(c => {
+        c.radius += 1; // 속도 그대로
+        ctx.beginPath();
+        ctx.setLineDash([]);
+        ctx.strokeStyle = "black";
+        ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillText("r=" + Math.floor(c.radius), c.x + c.radius + 6, c.y);
+      });
+
+      // 퍼펙트 범위(초록 점선)
+      ctx.setLineDash([6 / view.scale, 6 / view.scale]);
+      ctx.strokeStyle = "green";
       ctx.beginPath();
-      ctx.setLineDash([]);
-      ctx.strokeStyle = "black";
-      ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+      ctx.arc(300, 200, PERFECT_MIN, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillText("r=" + Math.floor(c.radius), c.x + c.radius + 6, c.y);
-    });
+      ctx.beginPath();
+      ctx.arc(300, 200, PERFECT_MAX, 0, Math.PI * 2);
+      ctx.stroke();
 
-    // 퍼펙트 범위(초록 점선)
-    ctx.setLineDash([6 / view.scale, 6 / view.scale]);
-    ctx.strokeStyle = "green";
-    ctx.beginPath();
-    ctx.arc(300, 200, PERFECT_MIN, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(300, 200, PERFECT_MAX, 0, Math.PI * 2);
-    ctx.stroke();
+      // 타깃(빨간 점선)
+      ctx.setLineDash([10 / view.scale, 7 / view.scale]);
+      ctx.strokeStyle = "red";
+      ctx.beginPath();
+      ctx.arc(300, 200, TARGET, 0, Math.PI * 2);
+      ctx.stroke();
 
-    // 타깃(빨간 점선)
-    ctx.setLineDash([10 / view.scale, 7 / view.scale]);
-    ctx.strokeStyle = "red";
-    ctx.beginPath();
-    ctx.arc(300, 200, TARGET, 0, Math.PI * 2);
-    ctx.stroke();
+      requestAnimationFrame(updateGame);
+    }
 
-    requestAnimationFrame(updateGame);
-  }
+    // ====== 화면 구성 ======
+    function startGame() {
+      document.getElementById("content").innerHTML = `
+        <div class="input-row">
+          <label for="studentId">학번</label>
+          <input id="studentId" type="text" placeholder="예) 30123">
+        </div>
+        <div class="input-row">
+          <label for="name">이름</label>
+          <input id="name" type="text" placeholder="이름을 입력하세요">
+        </div>
+        <div class="bar">
+          <button onclick="gameStart()">입력 완료</button>
+        </div>
+      `;
+    }
 
-  // ====== 화면 구성 ======
-  function startGame() {
-  document.getElementById("content").innerHTML = `
-    <div class="input-row">
-      <label for="studentId">학번</label>
-      <input id="studentId" type="text" placeholder="예) 30123">
-    </div>
-    <div class="input-row">
-      <label for="name">이름</label>
-      <input id="name" type="text" placeholder="이름을 입력하세요">
-    </div>
-    <div class="bar">
-      <button onclick="gameStart()">입력 완료</button>
-    </div>
-  `;
-}
+    function gameStart() {
+      const id = (document.getElementById("studentId").value || "").trim();
+      const name = (document.getElementById("name").value || "").trim();
 
+      document.getElementById("content").innerHTML = `
+        <canvas id="gameCanvas"></canvas>
+        <p>점수: <span id="score">0</span></p>
+        <p>${id} ${name} 님, 화면 중앙에서 <b>터치</b> 또는 PC는 <b>Space</b>!</p>
+      `;
 
-  function gameStart() {
-    const id = (document.getElementById("studentId").value || "").trim();
-    const name = (document.getElementById("name").value || "").trim();
+      gameArea = document.getElementById("gameCanvas");
+      ctx = gameArea.getContext("2d");
 
-    document.getElementById("content").innerHTML = `
-      <canvas id="gameCanvas"></canvas>
-      <p>점수: <span id="score">0</span></p>
-      <p>${id} ${name} 님, 음악에 맞춰 화면 중앙에서 터치 또는 스페이스바! (모바일: 터치, PC: Space)</p>
-    `;
+      gameInterval = setInterval(createCircle, 2000);
+      resizeCanvas();
+      requestAnimationFrame(updateGame);
 
-    gameArea = document.getElementById("gameCanvas");
-    ctx = gameArea.getContext("2d");
+      // 입력 등록
+      document.addEventListener("keydown", onKeyDown, { passive: true });
+      gameArea.addEventListener("pointerdown", onPointerDown, { passive: true });
 
-    gameInterval = setInterval(createCircle, 2000);
-    resizeCanvas();
-    requestAnimationFrame(updateGame);
+      // 반응형
+      window.addEventListener("resize", resizeCanvas);
+      window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
+    }
 
-    // 입력 등록
-    document.addEventListener("keydown", onKeyDown, { passive: true });
-    gameArea.addEventListener("pointerdown", onPointerDown, { passive: true });
+    // ====== 데이터 ======
+    function createCircle() {
+      circles.push({ x: 300, y: 200, radius: 10 });
+    }
 
-    // 반응형
-    window.addEventListener("resize", resizeCanvas);
-    window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
-  }
-
-  // ====== 데이터 ======
-  function createCircle() {
-    circles.push({ x: 300, y: 200, radius: 10 });
-  }
-
-  function showRanking() {
-    document.getElementById("content").innerHTML = `<p>랭킹 기능은 추후 추가 예정</p>`;
-  }
-</script>
-
-
-
+    function showRanking() {
+      document.getElementById("content").innerHTML = `<p>랭킹 기능은 추후 추가 예정</p>`;
+    }
+  </script>
 </body>
 </html>
-
-
-
-
