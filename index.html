@@ -94,14 +94,14 @@
     const DESIGN_H = 400;
 
     // 판정 상수
-    const TARGET = 70;
-    const PERFECT_MIN = 60;
-    const PERFECT_MAX = 80;
+    const TARGET = 35;
+    const PERFECT_MIN = 30;
+    const PERFECT_MAX = 40;
 
     // 터치 히트박스 (논리 좌표 기준)
     const TOUCH_CENTER_X = 300;
     const TOUCH_CENTER_Y = 200;
-    const TOUCH_HIT_RADIUS = 65;
+    const TOUCH_HIT_RADIUS = 33;
 
     // 뷰(스크린 스케일/오프셋) 상태
     const view = { cssW:0, cssH:0, dpr:1, scale:1, offsetX:0, offsetY:0 };
@@ -210,7 +210,7 @@
 
       // 원 업데이트 & 그리기
       circles.forEach(c => {
-        c.radius += 1; // 속도 그대로
+        c.radius += 0.5; // 속도 그대로
         ctx.beginPath();
         ctx.setLineDash([]);
         ctx.strokeStyle = "black";
@@ -288,6 +288,7 @@
     // ====== 데이터 ======
     function createCircle() {
       circles.push({ x: 300, y: 200, radius: 10 });
+      circles.push({ x: 300, y: 200, radius: 5 });
     }
 
     function showRanking() {
@@ -296,4 +297,5 @@
   </script>
 </body>
 </html>
+
 
