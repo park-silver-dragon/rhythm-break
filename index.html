@@ -21,6 +21,53 @@
   let circles = [];
   let gameInterval;
 
+    // 게임 화면 업데이트
+function updateGame(ctx) {
+  ctx.clearRect(0, 0, gameArea.width, gameArea.height);
+
+  circles.forEach(c => {
+    c.radius += 1;
+
+    // 원 그리기
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 반지름 값 표시
+    ctx.fillText("r=" + c.radius, c.x + c.radius + 5, c.y);
+  });
+
+  // 목표 반지름(50) 가이드 원 표시
+  ctx.beginPath();
+  ctx.arc(300, 200, 50, 0, Math.PI * 2);
+  ctx.setLineDash([5, 5]); // 점선
+  ctx.strokeStyle = "red";
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = "black";
+
+  requestAnimationFrame(() => updateGame(ctx));
+}
+
+    function checkHit(event) {
+  if (event.code === "Space") {
+    if (circles.length > 0) {
+      const c = circles[0]; // 첫 번째 원
+      const diff = Math.abs(c.radius - 50); // 목표 반지름 50
+      if (diff < 10) {
+        score += 100;
+      } else if (diff < 25) {
+        score += 50;
+      } else {
+        score += 10;
+      }
+      document.getElementById("score").innerText = score;
+      circles.shift(); // 원 제거
+    }
+  }
+}
+
+
   function startGame() {
     document.getElementById("content").innerHTML = `
       <p>학번: <input id="studentId"></p>
@@ -102,4 +149,5 @@
 
 </body>
 </html>
+
 
