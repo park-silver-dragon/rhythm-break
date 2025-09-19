@@ -16,25 +16,90 @@
   <div id="content"></div>
 
   <script>
-    function startGame() {
-      document.getElementById("content").innerHTML = `
-        <p>학번: <input id="studentId"></p>
-        <p>이름: <input id="name"></p>
-        <button onclick="gameStart()">입력 완료</button>
-      `;
-    }
+  let gameArea;
+  let score = 0;
+  let circles = [];
+  let gameInterval;
 
-    function gameStart() {
-      const id = document.getElementById("studentId").value;
-      const name = document.getElementById("name").value;
-      document.getElementById("content").innerHTML =
-        `<p>${id} ${name} 님, 게임이 곧 시작됩니다!</p>`;
-    }
+  function startGame() {
+    document.getElementById("content").innerHTML = `
+      <p>학번: <input id="studentId"></p>
+      <p>이름: <input id="name"></p>
+      <button onclick="gameStart()">입력 완료</button>
+    `;
+  }
 
-    function showRanking() {
-      document.getElementById("content").innerHTML =
-        `<p>랭킹 기능은 추후 추가 예정</p>`;
+  function gameStart() {
+    const id = document.getElementById("studentId").value;
+    const name = document.getElementById("name").value;
+
+    // 게임 화면 구성
+    document.getElementById("content").innerHTML = `
+      <canvas id="gameCanvas" width="600" height="400" style="border:1px solid black;"></canvas>
+      <p>점수: <span id="score">0</span></p>
+      <p>${id} ${name} 님, 음악에 맞춰 키를 눌러보세요!</p>
+    `;
+
+    gameArea = document.getElementById("gameCanvas");
+    const ctx = gameArea.getContext("2d");
+
+    // 일정 시간마다 원 생성
+    gameInterval = setInterval(() => {
+      createCircle();
+    }, 2000); // 2초마다 생성
+
+    // 애니메이션 루프 시작
+    requestAnimationFrame(() => updateGame(ctx));
+
+    // 키 입력 이벤트 등록 (스페이스바)
+    document.addEventListener("keydown", checkHit);
+  }
+
+  // 원 생성
+  function createCircle() {
+    circles.push({ x: 300, y: 200, radius: 10 });
+  }
+
+  // 게임 화면 업데이트
+  function updateGame(ctx) {
+    ctx.clearRect(0, 0, gameArea.width, gameArea.height);
+
+    // 원을 점점 크게
+    circles.forEach(c => {
+      c.radius += 1;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+
+    requestAnimationFrame(() => updateGame(ctx));
+  }
+
+  // 키 입력 시 판정 체크
+  function checkHit(event) {
+    if (event.code === "Space") {
+      if (circles.length > 0) {
+        const c = circles[0]; // 첫 번째 원
+        const diff = Math.abs(c.radius - 50); // 목표 반지름 50
+        if (diff < 5) {
+          score += 100;
+        } else if (diff < 15) {
+          score += 50;
+        } else {
+          score += 10;
+        }
+        document.getElementById("score").innerText = score;
+        circles.shift(); // 원 제거
+      }
     }
-  </script>
+  }
+
+  function showRanking() {
+    document.getElementById("content").innerHTML =
+      `<p>랭킹 기능은 추후 추가 예정</p>`;
+  }
+</script>
+
 </body>
 </html>
+
