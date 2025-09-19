@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>리듬게임</title>
+  <style>
+    body { text-align: center; font-family: sans-serif; margin-top: 100px; }
+    button { font-size: 20px; margin: 10px; padding: 10px 20px; }
+  </style>
+</head>
+<body>
+  <h1>🎵 리듬게임 🎵</h1>
+  <button onclick="startGame()">게임 시작</button>
+  <button onclick="showRanking()">랭킹 확인</button>
+
+  <div id="content"></div>
+
+  <script>
+    function startGame() {
+      document.getElementById("content").innerHTML = `
+        <p>학번: <input id="studentId"></p>
+        <p>이름: <input id="name"></p>
+        <button onclick="gameStart()">입력 완료</button>
+      `;
+    }
+
+    function gameStart() {
+      const id = document.getElementById("studentId").value;
+      const name = document.getElementById("name").value;
+      document.getElementById("content").innerHTML =
+        `<p>${id} ${name} 님, 게임이 곧 시작됩니다!</p>`;
+    }
+
+    function showRanking() {
+      document.getElementById("content").innerHTML =
+        `<p>랭킹 기능은 추후 추가 예정</p>`;
+    }
+  </script>
+</body>
+</html>
