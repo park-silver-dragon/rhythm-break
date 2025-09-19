@@ -15,38 +15,54 @@
 
   <div id="content"></div>
 
-  <script>
+<script>
   let gameArea;
   let score = 0;
   let circles = [];
   let gameInterval;
 
-  // 🔄 게임 화면 업데이트 (점선 가이드 포함)
+  // 판정 상수
+  const TARGET = 70;
+  const PERFECT_MIN = 60;
+  const PERFECT_MAX = 80;
+
+  // 🔄 게임 화면 업데이트 (가이드 포함)
   function updateGame(ctx) {
     ctx.clearRect(0, 0, gameArea.width, gameArea.height);
 
     circles.forEach(c => {
-      c.radius += 1;
-
-      // 원 그리기 (검정 실선)
+      c.radius += 1; // 속도 그대로
+      // 원 (검정 실선)
       ctx.beginPath();
       ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
       ctx.strokeStyle = "black";
       ctx.setLineDash([]);
       ctx.stroke();
 
-      // 반지름 값 표시
+      // 반지름 표기
       ctx.fillText("r=" + Math.floor(c.radius), c.x + c.radius + 5, c.y);
     });
 
-    // 🎯 목표 반지름 50짜리 점선 가이드 원
+    // 🎯 가이드: 퍼펙트 존(60~80) 테두리 + 중앙 타겟(70)
+    // 1) 퍼펙트 경계 60, 80 (초록 점선)
     ctx.beginPath();
-    ctx.arc(300, 200, 50, 0, Math.PI * 2);
-    ctx.strokeStyle = "red";
-    ctx.setLineDash([5, 5]); // 점선
+    ctx.arc(300, 200, PERFECT_MIN, 0, Math.PI * 2);
+    ctx.strokeStyle = "green";
+    ctx.setLineDash([4, 4]);
     ctx.stroke();
 
-    // 다시 기본으로 복원
+    ctx.beginPath();
+    ctx.arc(300, 200, PERFECT_MAX, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 2) 중앙 타겟 70 (빨간 점선)
+    ctx.beginPath();
+    ctx.arc(300, 200, TARGET, 0, Math.PI * 2);
+    ctx.strokeStyle = "red";
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+
+    // 복원
     ctx.setLineDash([]);
     ctx.strokeStyle = "black";
 
@@ -55,21 +71,26 @@
 
   // ✅ 판정 체크
   function checkHit(event) {
-    if (event.code === "Space") {
-      if (circles.length > 0) {
-        const c = circles[0]; // 첫 번째 원
-        const diff = Math.abs(c.radius - 50); // 목표 반지름 50
-        if (diff < 10) {
-          score += 100;
-        } else if (diff < 25) {
-          score += 50;
-        } else {
-          score += 10;
-        }
-        document.getElementById("score").innerText = score;
-        circles.shift(); // 원 제거
-      }
+    if (event.code !== "Space") return;
+    if (circles.length === 0) return;
+
+    const c = circles[0];
+    const r = c.radius;
+    let gained = 0;
+
+    // 최대 점수 조건: 60 < r < 80
+    if (r > PERFECT_MIN && r < PERFECT_MAX) {
+      gained = 100;
+    } else if (Math.abs(r - TARGET) < 25) {
+      // 세컨드 보상: 타겟에서 ±25 이내
+      gained = 50;
+    } else {
+      gained = 10;
     }
+
+    score += gained;
+    document.getElementById("score").innerText = score;
+    circles.shift(); // 사용한 원 제거
   }
 
   // 시작 버튼 클릭 시
@@ -95,15 +116,8 @@
     gameArea = document.getElementById("gameCanvas");
     const ctx = gameArea.getContext("2d");
 
-    // 2초마다 원 생성
-    gameInterval = setInterval(() => {
-      createCircle();
-    }, 2000);
-
-    // 애니메이션 시작
+    gameInterval = setInterval(createCircle, 2000); // 속도 그대로(2초마다 생성)
     requestAnimationFrame(() => updateGame(ctx));
-
-    // 키 입력 이벤트 등록
     document.addEventListener("keydown", checkHit);
   }
 
@@ -116,7 +130,9 @@
     document.getElementById("content").innerHTML =
       `<p>랭킹 기능은 추후 추가 예정</p>`;
   }
-  </script>
+</script>
+
 
 </body>
 </html>
+
