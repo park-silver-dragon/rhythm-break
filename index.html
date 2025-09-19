@@ -1,31 +1,85 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta charset="UTF-8">
   <title>리듬게임</title>
   <style>
   :root { --max-width: 900px; }
+
   * { box-sizing: border-box; }
-  body {
+
+  html, body {
     margin: 0;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
     display: flex; flex-direction: column; align-items: center;
     padding: 16px;
+    background: #fff;
   }
-  h1 { margin: 12px 0 8px; font-size: clamp(18px, 4vw, 28px); }
-  .bar { width: 100%; max-width: var(--max-width); display:flex; justify-content:center; gap:12px; margin-bottom: 12px; }
-  button { font-size: clamp(14px, 3.8vw, 18px); padding: 10px 16px; border-radius: 10px; border: 1px solid #ccc; background:#fff; }
+
+  /* ✅ 타이틀 크게: 모바일에서도 확실히 보이게 */
+  h1 {
+    margin: 12px 0 10px;
+    line-height: 1.2;
+    font-weight: 800;
+    font-size: clamp(24px, 7vw, 40px);
+    letter-spacing: -0.02em;
+  }
+
+  /* 버튼/입력창 컨테이너 */
+  .bar { width: 100%; max-width: var(--max-width); display:flex; justify-content:center; gap:12px; flex-wrap: wrap; margin-bottom: 12px; }
+
+  /* ✅ 버튼 크게 + 터치 타깃 확보(최소 44px 높이) */
+  button {
+    font-size: clamp(16px, 4.5vw, 18px);
+    padding: 14px 18px;
+    min-height: 48px;
+    border-radius: 12px;
+    border: 1px solid #d0d0d0;
+    background:#ffffff;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+  }
+
+  button:active { transform: translateY(1px); }
+
+  /* 컨텐츠 폭 */
   #content { width: 100%; max-width: var(--max-width); }
-  /* 캔버스는 모바일 우선: 폭 가득, 높이는 비율 유지(600:400=3:2) */
+
+  /* ✅ 입력창 크게 */
+  .input-row { display:flex; align-items:center; justify-content:center; gap:10px; margin: 10px 0; }
+  label { font-size: clamp(15px, 4.2vw, 17px); }
+  input[type="text"] {
+    font-size: clamp(16px, 4.8vw, 18px);
+    padding: 12px 14px;
+    min-height: 48px;
+    width: min(420px, 80vw);
+    border: 1.2px solid #cfcfcf;
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  /* 본문 텍스트 */
+  p { margin: 10px 0; font-size: clamp(15px, 4.2vw, 17px); text-align:center; }
+
+  /* 캔버스는 그대로 반응형 (이전 단계 유지) */
   canvas {
     width: 100%;
-    /* 화면이 너무 높게 차지하지 않도록 상한: 모바일 70vh, 데스크탑 60vh */
-    max-height: 70vh;
+    max-height: 70vh; /* 모바일 상한 */
     display: block; margin: 0 auto; border: 1px solid #000;
     touch-action: manipulation;
   }
-  p { margin: 8px 0; font-size: clamp(14px, 3.6vw, 16px); text-align:center; }
+
+  /* 데스크탑에서 살짝 줄이기 */
+  @media (min-width: 1024px) {
+    button { padding: 12px 16px; }
+    input[type="text"] { width: 420px; }
+  }
 </style>
+
 
 </head>
 <body>
@@ -206,12 +260,21 @@
 
   // ====== 화면 구성 ======
   function startGame() {
-    document.getElementById("content").innerHTML = `
-      <p>학번: <input id="studentId"></p>
-      <p>이름: <input id="name"></p>
-      <div class="bar"><button onclick="gameStart()">입력 완료</button></div>
-    `;
-  }
+  document.getElementById("content").innerHTML = `
+    <div class="input-row">
+      <label for="studentId">학번</label>
+      <input id="studentId" type="text" placeholder="예) 30123">
+    </div>
+    <div class="input-row">
+      <label for="name">이름</label>
+      <input id="name" type="text" placeholder="이름을 입력하세요">
+    </div>
+    <div class="bar">
+      <button onclick="gameStart()">입력 완료</button>
+    </div>
+  `;
+}
+
 
   function gameStart() {
     const id = (document.getElementById("studentId").value || "").trim();
@@ -253,6 +316,7 @@
 
 </body>
 </html>
+
 
 
 
