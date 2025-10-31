@@ -12,9 +12,10 @@
       margin: 0;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       -webkit-text-size-adjust: 100%;
-      background: #000; /* 밤 분위기 살리기 */
+      background: #000;
+      color: #fff;
     }
-    body { display: flex; flex-direction: column; align-items: center; padding: 16px; color:#fff; }
+    body { display: flex; flex-direction: column; align-items: center; padding: 16px; }
 
     h1 {
       margin: 12px 0 10px; line-height: 1.2; font-weight: 800;
@@ -55,10 +56,24 @@
       touch-action: manipulation; background: transparent;
     }
 
-    @media (min-width: 1024px) {
-      button { padding: 12px 16px; }
-      input[type="text"] { width: 420px; }
-      canvas { max-height: 60vh; }
+    /* 배치 모드 레이아웃 */
+    .dev-wrap { display:flex; gap:12px; align-items:flex-start; }
+    .canvas-col { flex: 2 1 0; }
+    .panel-col  { flex: 1 1 280px; border:1px solid #222; border-radius:12px; padding:10px; background:#0b0b0b; }
+    .panel-col h3 { margin: 0 0 8px; font-size: 16px; }
+    .panel-col .actions { display:flex; gap:8px; margin:8px 0 6px; }
+    .panel-col textarea {
+      width: 100%; height: 52vh;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px; line-height: 1.5;
+      background: #0f0f0f; color:#eaeaea; border:1px solid #2a2a2a; border-radius:10px;
+      padding:10px; resize: vertical;
+    }
+    .hint { color:#bbb; font-size:12px; margin-top:6px; }
+
+    @media (max-width: 900px) {
+      .dev-wrap { flex-direction: column; }
+      .panel-col textarea { height: 30vh; }
     }
   </style>
 </head>
@@ -66,6 +81,7 @@
   <h1>🎵 리듬게임 🎵</h1>
 
   <div class="bar menu">
+    <button onclick="enterPlacementMode()">타일 배치</button>
     <button onclick="startGame()">게임 시작</button>
     <button onclick="showRanking()">랭킹 확인</button>
   </div>
@@ -78,6 +94,14 @@
     let score = 0;
     let circles = [];
     let gameStartAt = 0;
+    let loopStarted = false;
+
+    // 개발자 배치 모드
+    let devMode = false;
+    let placements = [];  // {x, y, t}
+    let activeTimers = [];
+    let showGhost = false;
+    const mouse = { x: 300, y: 200 };
 
     // 논리 좌표(디자인 해상도)
     const DESIGN_W = 600;
@@ -104,11 +128,12 @@
     imgPerfect.crossOrigin = "anonymous";
     imgPerfect.src = "assets/perfect.png";
 
-    // ===== 배경 레이어 =====
+    // ===== 배경 레이어 ===== (원하는 v2/v3 파일로 교체 가능)
     const bgSky    = new Image(); bgSky.src    = "assets/bg_sky.png";
-    const bgFar   = new Image(); bgFar.src   = "assets/bg_forest_far_v3.png";
-    const bgNear  = new Image(); bgNear.src  = "assets/bg_forest_near_v3.png";
-    const bgBlack = new Image(); bgBlack.src = "assets/bg_forest_black_v3.png";
+    const bgFar    = new Image(); bgFar.src    = "assets/bg_forest_far_v3.png";
+    const bgNear   = new Image(); bgNear.src   = "assets/bg_forest_near_v3.png";
+    const bgBlack  = new Image(); bgBlack.src  = "assets/bg_forest_black_v3.png";
+
     // 스크롤 오프셋과 속도 (오른쪽 이동)
     let bgOff = { sky: 0, far: 0, near: 0, black: 0 };
     const BG_SPEED = { sky: 0.2, far: 0.6, near: 1.0, black: 1.6 };
@@ -117,7 +142,21 @@
     const view = { cssW:0, cssH:0, dpr:1, scale:1, offsetX:0, offsetY:0 };
 
     // ====== 유틸 ======
-    function getPlayTimeMs() { return performance.now() - gameStartAt; }
+    function getPlayTimeMs() { return devMode ? 0 : (performance.now() - gameStartAt); }
+
+    function sortPlacements() { placements.sort((a,b)=>a.t - b.t); }
+
+    function generateCodeText() {
+      sortPlacements();
+      return placements.map(p => `setTimeout(() => createCircle(${p.x}, ${p.y}), ${p.t});`).join("\n");
+    }
+
+    function copyCode() {
+      const ta = document.getElementById("codeList");
+      if (!ta) return;
+      ta.select();
+      document.execCommand("copy");
+    }
 
     // ====== 리사이즈 & 스케일링 ======
     function resizeCanvas() {
@@ -170,12 +209,10 @@
       if (!img.complete || img.naturalWidth === 0) return;
       const iw = img.naturalWidth, ih = img.naturalHeight;
 
-      // 레이어 높이를 디자인 높이에 맞추고 가로는 비율 유지
       const scale = DESIGN_H / ih;
       const drawW = Math.ceil(iw * scale);
       const drawH = Math.ceil(ih * scale);
 
-      // 오른쪽 이동: off가 증가할수록 우측으로 흐름
       let startX = - (ox % drawW);
       if (startX > 0) startX -= drawW;
 
@@ -190,10 +227,10 @@
       bgOff.near += BG_SPEED.near;
       bgOff.black+= BG_SPEED.black;
 
-      drawTiled(bgSky,   bgOff.sky,   0); // 뒤
+      drawTiled(bgSky,   bgOff.sky,   0);
       drawTiled(bgFar,   bgOff.far,   0);
       drawTiled(bgNear,  bgOff.near,  0);
-      drawTiled(bgBlack, bgOff.black, 0); // 앞
+      drawTiled(bgBlack, bgOff.black, 0);
     }
 
     // ====== 공용 판정 처리 ======
@@ -204,26 +241,28 @@
       let gained = 0;
 
       if (r > PERFECT_MIN && r < PERFECT_MAX) {
-        gained = 100;                // 30 < r < 40
+        gained = 100;
       } else if (Math.abs(r - TARGET) < 25) {
-        gained = 50;                 // 타깃 ±25
+        gained = 50;
       } else {
         gained = 10;
       }
 
       score += gained;
-      document.getElementById("score").innerText = score;
+      const el = document.getElementById("score");
+      if (el) el.innerText = score;
       circles.splice(index, 1);
     }
 
-    // ====== 입력: 키보드(PC 테스트용) ======
+    // ====== 입력: 키보드(게임용) ======
     function onKeyDown(e) {
+      if (devMode) return; // 배치모드에서는 Space 판정 비활성
       if (e.code !== "Space") return;
       if (circles.length === 0) return;
       attemptHitOn(0);
     }
 
-    // ====== 입력: 터치/클릭(모바일 우선) ======
+    // ====== 입력: 터치/클릭(게임용) ======
     function screenToLogical(clientX, clientY) {
       const rect = gameArea.getBoundingClientRect();
       const cssX = clientX - rect.left;
@@ -234,6 +273,7 @@
     }
 
     function onPointerDown(e) {
+      if (devMode) return; // 배치모드 클릭은 별도 핸들러 사용
       const { x, y } = screenToLogical(e.clientX, e.clientY);
 
       // 터치 지점에서 가까운 원 찾기
@@ -251,8 +291,34 @@
       if (bestIdx !== -1) attemptHitOn(bestIdx);
     }
 
+    // ====== 배치모드 핸들러 ======
+    function devKeyDown(e) {
+      if (!devMode) return;
+      if (e.code === "KeyK") showGhost = true;
+    }
+    function devKeyUp(e) {
+      if (!devMode) return;
+      if (e.code === "KeyK") showGhost = false;
+    }
+    function onDevPointerMove(e) {
+      if (!devMode) return;
+      const { x, y } = screenToLogical(e.clientX, e.clientY);
+      mouse.x = Math.round(x);
+      mouse.y = Math.round(y);
+    }
+    function onDevPointerDown(e) {
+      if (!devMode) return;
+      if (!showGhost) return; // K키를 누른 상태에서만 배치
+      const { x, y } = screenToLogical(e.clientX, e.clientY);
+      placements.push({ x: Math.round(x), y: Math.round(y), t: 99999 });
+      sortPlacements();
+      refreshCodePanel();
+    }
+
     // ====== 게임 루프 ======
     function updateGame() {
+      if (!ctx) { requestAnimationFrame(updateGame); return; }
+
       clearFrame();
 
       // 선/폰트 보정 먼저
@@ -260,7 +326,7 @@
       ctx.lineWidth = lw;
       ctx.font = `${Math.max(10, Math.floor(12 / view.scale))}px sans-serif`;
 
-      // 배경 먼저
+      // 배경
       updateBackground();
 
       // 우측 상단 플레이타임
@@ -273,47 +339,73 @@
       ctx.fillText(`t=${tSec}s`, DESIGN_W - 8, 6);
       ctx.restore();
 
-      // 노트/퍼펙트 업데이트 & 렌더
-      circles.forEach(c => {
-        c.radius += 0.5; // 절반 속도
+      // 노트/퍼펙트 업데이트 & 렌더 (게임 모드일 때만 원이 커짐)
+      if (!devMode) {
+        circles.forEach(c => {
+          c.radius += 0.5; // 절반 속도
 
-        const size = c.radius * 2;
+          const size = c.radius * 2;
+          if (imgNote.complete && imgNote.naturalWidth > 0) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(imgNote, c.x - c.radius, c.y - c.radius, size, size);
+          } else {
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = "#ddd";
+            ctx.stroke();
+          }
+
+          // 반지름 텍스트(옵션)
+          ctx.fillStyle = "#fff";
+          ctx.fillText("r=" + Math.floor(c.radius), c.x + c.radius + 3, c.y);
+
+          // 퍼펙트 기준 링
+          const pSize = TARGET * 2;
+          if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
+            ctx.drawImage(imgPerfect, c.x - TARGET, c.y - TARGET, pSize, pSize);
+          } else {
+            ctx.setLineDash([10 / view.scale, 7 / view.scale]);
+            ctx.strokeStyle = "red";
+            ctx.beginPath();
+            ctx.arc(c.x, c.y, TARGET, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        });
+
+        // r가 너무 커진 원 제거 (60 초과 제거)
+        circles = circles.filter(c => c.radius <= 60);
+      }
+
+      // 배치모드: K키 미리보기
+      if (devMode && showGhost) {
+        const r = 5;
+        const size = r * 2;
+        ctx.save();
+        ctx.globalAlpha = 0.8;
         if (imgNote.complete && imgNote.naturalWidth > 0) {
-          ctx.imageSmoothingEnabled = true;
-          ctx.drawImage(imgNote, c.x - c.radius, c.y - c.radius, size, size);
-        } else { // 로딩 전 임시 표시
-          ctx.beginPath();
-          ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
-          ctx.strokeStyle = "#ddd";
-          ctx.stroke();
-        }
-
-        // 반지름 텍스트(옵션)
-        ctx.fillStyle = "#fff";
-        ctx.fillText("r=" + Math.floor(c.radius), c.x + c.radius + 3, c.y);
-
-        // 퍼펙트 기준 링
-        const pSize = TARGET * 2;
-        if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
-          ctx.drawImage(imgPerfect, c.x - TARGET, c.y - TARGET, pSize, pSize);
+          ctx.drawImage(imgNote, mouse.x - r, mouse.y - r, size, size);
         } else {
-          ctx.setLineDash([10 / view.scale, 7 / view.scale]);
-          ctx.strokeStyle = "red";
           ctx.beginPath();
-          ctx.arc(c.x, c.y, TARGET, 0, Math.PI * 2);
+          ctx.arc(mouse.x, mouse.y, r, 0, Math.PI * 2);
+          ctx.strokeStyle = "#77ff77";
           ctx.stroke();
-          ctx.setLineDash([]);
         }
-      });
-
-      // r가 너무 커진 원 제거 (60 초과 제거)
-      circles = circles.filter(c => c.radius <= 60);
+        // 퍼펙트 기준 링 미리보기(옵션)
+        ctx.globalAlpha = 0.6;
+        const p = TARGET * 2;
+        if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
+          ctx.drawImage(imgPerfect, mouse.x - TARGET, mouse.y - TARGET, p, p);
+        }
+        ctx.restore();
+      }
 
       requestAnimationFrame(updateGame);
     }
 
     // ====== 화면 구성 ======
     function startGame() {
+      // 입력 폼
       document.getElementById("content").innerHTML = `
         <div class="input-row">
           <label for="studentId">학번</label>
@@ -340,20 +432,26 @@
            (모바일: 터치 근처 원 판정 / PC: Space)</p>
       `;
 
+      devMode = false;  // 게임 모드
+
       gameArea = document.getElementById("gameCanvas");
       ctx = gameArea.getContext("2d");
 
       resizeCanvas();
 
-      // 시작 시각을 먼저 기록 → 루프 시작
-      gameStartAt = performance.now();
-      requestAnimationFrame(updateGame);
+      // 루프는 1회만 시작
+      if (!loopStarted) { loopStarted = true; requestAnimationFrame(updateGame); }
 
-      // 입력 등록
+      // 기존 리스너 정리 후 게임 리스너 등록
+      document.removeEventListener("keydown", devKeyDown);
+      document.removeEventListener("keyup", devKeyUp);
+      if (gameArea) {
+        gameArea.removeEventListener("pointermove", onDevPointerMove);
+        gameArea.removeEventListener("pointerdown", onDevPointerDown);
+      }
       document.addEventListener("keydown", onKeyDown, { passive: true });
       gameArea.addEventListener("pointerdown", onPointerDown, { passive: true });
 
-      // 반응형
       window.addEventListener("resize", resizeCanvas);
       window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
 
@@ -369,12 +467,19 @@
           };
           gameArea.addEventListener("pointerdown", unlock, { once: true });
         });
-      } catch (e) {
-        console.warn("BGM 재생 실패:", e);
-      }
+      } catch (e) { console.warn("BGM 재생 실패:", e); }
 
-      // 예시: 시작 5초 후 (100,100)에 원 생성
-      setTimeout(() => createCircle(100, 100), 5000);
+      // 이전 타이머 정리
+      activeTimers.forEach(id => clearTimeout(id));
+      activeTimers = [];
+      circles = [];
+
+      // 배치 목록대로 스케줄링
+      sortPlacements();
+      placements.forEach(p => {
+        const id = setTimeout(() => createCircle(p.x, p.y), p.t);
+        activeTimers.push(id);
+      });
 
       // 탭 전환 시 일시정지/재개
       document.addEventListener("visibilitychange", () => {
@@ -382,6 +487,80 @@
         if (document.hidden) bgm.pause();
         else bgm.play().catch(()=>{});
       });
+
+      // 플레이타임 시작
+      gameStartAt = performance.now();
+    }
+
+    function enterPlacementMode() {
+      // 배치 모드 UI
+      document.getElementById("content").innerHTML = `
+        <div class="dev-wrap">
+          <div class="canvas-col"><canvas id="gameCanvas"></canvas></div>
+          <div class="panel-col">
+            <h3>배치 코드 (시간순)</h3>
+            <div class="actions">
+              <button onclick="copyCode()">코드 복사</button>
+              <button onclick="placements=[]; refreshCodePanel();">모두 삭제</button>
+            </div>
+            <textarea id="codeList" spellcheck="false"></textarea>
+            <p class="hint">K 키 누르고 이동: 미리보기 • 클릭: 배치 추가 • 기본 시간 99999ms<br>
+            라인 편집 시 즉시 반영됩니다. 예) <code>setTimeout(() => createCircle(300, 200), 1500);</code></p>
+          </div>
+        </div>
+      `;
+
+      devMode = true;
+
+      // BGM 정지
+      try { if (bgm) bgm.pause(); } catch(e) {}
+
+      gameArea = document.getElementById("gameCanvas");
+      ctx = gameArea.getContext("2d");
+      resizeCanvas();
+
+      if (!loopStarted) { loopStarted = true; requestAnimationFrame(updateGame); }
+
+      // 게임 리스너 제거, 배치 리스너 등록
+      document.removeEventListener("keydown", onKeyDown);
+      if (gameArea) gameArea.removeEventListener("pointerdown", onPointerDown);
+      document.addEventListener("keydown", devKeyDown, { passive: true });
+      document.addEventListener("keyup", devKeyUp, { passive: true });
+      gameArea.addEventListener("pointermove", onDevPointerMove, { passive: true });
+      gameArea.addEventListener("pointerdown", onDevPointerDown, { passive: true });
+
+      window.addEventListener("resize", resizeCanvas);
+      window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
+
+      refreshCodePanel();
+
+      // 코드 편집 실시간 반영
+      const ta = document.getElementById("codeList");
+      ta.addEventListener("input", onCodeInput);
+    }
+
+    let updatingCodePanel = false;
+    function refreshCodePanel() {
+      const ta = document.getElementById("codeList");
+      if (!ta) return;
+      updatingCodePanel = true;
+      ta.value = generateCodeText();
+      updatingCodePanel = false;
+    }
+
+    function onCodeInput(e) {
+      if (updatingCodePanel) return;
+      const lines = e.target.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      const re = /^setTimeout\(\s*\(\)\s*=>\s*createCircle\(\s*(\d+)\s*,\s*(\d+)\s*\)\s*,\s*(\d+)\s*\)\s*;?$/;
+      const parsed = [];
+      for (const line of lines) {
+        const m = line.match(re);
+        if (m) parsed.push({ x:+m[1], y:+m[2], t:+m[3] });
+      }
+      if (parsed.length >= 0) {
+        placements = parsed;
+        refreshCodePanel(); // 정렬 & 정규화된 포맷으로 즉시 반영
+      }
     }
 
     // ====== 데이터 / API ======
@@ -392,7 +571,11 @@
     function showRanking() {
       document.getElementById("content").innerHTML = `<p>랭킹 기능은 추후 추가 예정</p>`;
     }
+
+    // 초기 상태: 간단 안내
+    document.getElementById("content").innerHTML = `
+      <p>좌측 상단의 <b>타일 배치</b>로 배치 모드에 들어가거나, <b>게임 시작</b>으로 테스트하세요.</p>
+    `;
   </script>
 </body>
 </html>
-
