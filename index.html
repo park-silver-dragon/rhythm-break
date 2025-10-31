@@ -12,9 +12,9 @@
       margin: 0;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       -webkit-text-size-adjust: 100%;
-      background: #fff;
+      background: #000; /* 밤 분위기 살리기 */
     }
-    body { display: flex; flex-direction: column; align-items: center; padding: 16px; }
+    body { display: flex; flex-direction: column; align-items: center; padding: 16px; color:#fff; }
 
     h1 {
       margin: 12px 0 10px; line-height: 1.2; font-weight: 800;
@@ -31,8 +31,8 @@
     button {
       font-size: clamp(16px, 4.5vw, 18px);
       padding: 14px 18px; min-height: 48px;
-      border-radius: 12px; border: 1px solid #d0d0d0; background:#fff;
-      box-shadow: 0 1px 0 rgba(0,0,0,0.06); cursor: pointer;
+      border-radius: 12px; border: 1px solid #2a2a2a; background:#0b0b0b; color:#fff;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.06); cursor: pointer;
     }
     button:active { transform: translateY(1px); }
 
@@ -44,15 +44,15 @@
       font-size: clamp(16px, 4.8vw, 18px);
       padding: 12px 14px; min-height: 48px;
       width: min(420px, 80vw);
-      border: 1.2px solid #cfcfcf; border-radius: 10px; background: #fff;
+      border: 1.2px solid #3a3a3a; border-radius: 10px; background: #111; color:#fff;
     }
 
     p { margin: 10px 0; font-size: clamp(15px, 4.2vw, 17px); text-align:center; }
 
     canvas {
       width: 100%; max-height: 70vh;
-      display: block; margin: 0 auto; border: 1px solid #000;
-      touch-action: manipulation;
+      display: block; margin: 0 auto; border: 1px solid #222;
+      touch-action: manipulation; background: transparent;
     }
 
     @media (min-width: 1024px) {
@@ -93,9 +93,9 @@
 
     // ===== BGM =====
     let bgm;
-    const BGM_SRC = "assets/Halloween_Night.mp3"; // 음악 파일 경로
+    const BGM_SRC = "assets/Halloween_Night.mp3";
 
-    // 이미지 로드 (리포지토리에 /assets/note.png, /assets/perfect.png 업로드)
+    // ===== 노트/퍼펙트 이미지 =====
     const imgNote = new Image();
     imgNote.crossOrigin = "anonymous";
     imgNote.src = "assets/note.png";
@@ -103,6 +103,16 @@
     const imgPerfect = new Image();
     imgPerfect.crossOrigin = "anonymous";
     imgPerfect.src = "assets/perfect.png";
+
+    // ===== 배경 레이어 =====
+    const bgSky    = new Image(); bgSky.src    = "assets/bg_sky.png";
+    const bgFar    = new Image(); bgFar.src    = "assets/bg_forest_far.png";
+    const bgNear   = new Image(); bgNear.src   = "assets/bg_forest_near.png";
+    const bgBlack  = new Image(); bgBlack.src  = "assets/bg_forest_black.png";
+
+    // 스크롤 오프셋과 속도 (오른쪽 이동)
+    let bgOff = { sky: 0, far: 0, near: 0, black: 0 };
+    const BG_SPEED = { sky: 0.2, far: 0.6, near: 1.0, black: 1.6 };
 
     // 뷰(스크린 스케일/오프셋) 상태
     const view = { cssW:0, cssH:0, dpr:1, scale:1, offsetX:0, offsetY:0 };
@@ -154,6 +164,37 @@
       ctx.clearRect(0, 0, gameArea.width, gameArea.height);
       ctx.restore();
       applyViewTransform();
+    }
+
+    // ===== 배경 그리기 =====
+    function drawTiled(img, ox, oy) {
+      if (!img.complete || img.naturalWidth === 0) return;
+      const iw = img.naturalWidth, ih = img.naturalHeight;
+
+      // 레이어 높이를 디자인 높이에 맞추고 가로는 비율 유지
+      const scale = DESIGN_H / ih;
+      const drawW = Math.ceil(iw * scale);
+      const drawH = Math.ceil(ih * scale);
+
+      // 오른쪽 이동: off가 증가할수록 우측으로 흐름
+      let startX = - (ox % drawW);
+      if (startX > 0) startX -= drawW;
+
+      for (let x = startX; x < DESIGN_W; x += drawW) {
+        ctx.drawImage(img, x, oy + (DESIGN_H - drawH), drawW, drawH);
+      }
+    }
+
+    function updateBackground() {
+      bgOff.sky  += BG_SPEED.sky;
+      bgOff.far  += BG_SPEED.far;
+      bgOff.near += BG_SPEED.near;
+      bgOff.black+= BG_SPEED.black;
+
+      drawTiled(bgSky,   bgOff.sky,   0); // 뒤
+      drawTiled(bgFar,   bgOff.far,   0);
+      drawTiled(bgNear,  bgOff.near,  0);
+      drawTiled(bgBlack, bgOff.black, 0); // 앞
     }
 
     // ====== 공용 판정 처리 ======
@@ -220,37 +261,39 @@
       ctx.lineWidth = lw;
       ctx.font = `${Math.max(10, Math.floor(12 / view.scale))}px sans-serif`;
 
+      // 배경 먼저
+      updateBackground();
+
       // 우측 상단 플레이타임
       ctx.save();
       ctx.setLineDash([]);
-      ctx.fillStyle = "black";
+      ctx.fillStyle = "#fff";
       ctx.textAlign = "right";
       ctx.textBaseline = "top";
       const tSec = (getPlayTimeMs() / 1000).toFixed(2);
       ctx.fillText(`t=${tSec}s`, DESIGN_W - 8, 6);
       ctx.restore();
 
-      // 원 업데이트 & 그리기
+      // 노트/퍼펙트 업데이트 & 렌더
       circles.forEach(c => {
         c.radius += 0.5; // 절반 속도
 
-        // 노트 이미지
         const size = c.radius * 2;
         if (imgNote.complete && imgNote.naturalWidth > 0) {
           ctx.imageSmoothingEnabled = true;
           ctx.drawImage(imgNote, c.x - c.radius, c.y - c.radius, size, size);
-        } else {
-          // 로딩 전 임시 표시
+        } else { // 로딩 전 임시 표시
           ctx.beginPath();
           ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
-          ctx.strokeStyle = "black";
+          ctx.strokeStyle = "#ddd";
           ctx.stroke();
         }
 
         // 반지름 텍스트(옵션)
+        ctx.fillStyle = "#fff";
         ctx.fillText("r=" + Math.floor(c.radius), c.x + c.radius + 3, c.y);
 
-        // 퍼펙트 기준 링(각 오브젝트마다 1개)
+        // 퍼펙트 기준 링
         const pSize = TARGET * 2;
         if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
           ctx.drawImage(imgPerfect, c.x - TARGET, c.y - TARGET, pSize, pSize);
@@ -315,7 +358,7 @@
       window.addEventListener("resize", resizeCanvas);
       window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
 
-      // ===== BGM 재생 =====
+      // BGM 재생
       try {
         bgm = new Audio(BGM_SRC);
         bgm.loop = true;
@@ -331,10 +374,10 @@
         console.warn("BGM 재생 실패:", e);
       }
 
-      // (예시) 시작 5초 후 (100,100)에 원 생성
+      // 예시: 시작 5초 후 (100,100)에 원 생성
       setTimeout(() => createCircle(100, 100), 5000);
 
-      // 페이지 가시성 변화 시 BGM 일시정지/재개
+      // 탭 전환 시 일시정지/재개
       document.addEventListener("visibilitychange", () => {
         if (!bgm) return;
         if (document.hidden) bgm.pause();
