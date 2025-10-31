@@ -87,20 +87,18 @@
     let gameArea, ctx;
     let score = 0;
     let circles = [];
-    let gameInterval;
+    // let gameInterval; // 자동 스폰 제거로 미사용
 
-    // 논리 좌표(디자인 해상도) — 게임 로직은 이 좌표계를 기준으로만 동작
+    // 논리 좌표(디자인 해상도)
     const DESIGN_W = 600;
     const DESIGN_H = 400;
 
-    // 판정 상수
+    // 판정 상수 (절반 세팅)
     const TARGET = 35;
     const PERFECT_MIN = 30;
     const PERFECT_MAX = 40;
 
-    // 터치 히트박스 (논리 좌표 기준)
-    const TOUCH_CENTER_X = 300;
-    const TOUCH_CENTER_Y = 200;
+    // 터치 히트박스 (논리 좌표 기준, 절반 세팅)
     const TOUCH_HIT_RADIUS = 33;
 
     // 뷰(스크린 스케일/오프셋) 상태
@@ -156,29 +154,30 @@
     }
 
     // ====== 공용 판정 처리 ======
-    function attemptHit() {
-      if (circles.length === 0) return;
-      const c = circles[0];
+    function attemptHitOn(index) {
+      if (index < 0 || index >= circles.length) return;
+      const c = circles[index];
       const r = c.radius;
       let gained = 0;
 
       if (r > PERFECT_MIN && r < PERFECT_MAX) {
-        gained = 100;                // 60 < r < 80
+        gained = 100;                // 30 < r < 40
       } else if (Math.abs(r - TARGET) < 25) {
-        gained = 50;                 // 타겟 ±25
+        gained = 50;                 // 타깃 ±25
       } else {
         gained = 10;
       }
 
       score += gained;
       document.getElementById("score").innerText = score;
-      circles.shift(); // 사용한 원 제거
+      circles.splice(index, 1); // 해당 원 제거
     }
 
     // ====== 입력: 키보드(PC 테스트용) ======
     function onKeyDown(e) {
       if (e.code !== "Space") return;
-      attemptHit(); // 키보드는 히트박스 제한 없음
+      if (circles.length === 0) return;
+      attemptHitOn(0); // 가장 먼저 뜬 원
     }
 
     // ====== 입력: 터치/클릭(모바일 우선) ======
@@ -193,10 +192,20 @@
 
     function onPointerDown(e) {
       const { x, y } = screenToLogical(e.clientX, e.clientY);
-      const dx = x - TOUCH_CENTER_X;
-      const dy = y - TOUCH_CENTER_Y;
-      const dist = Math.hypot(dx, dy);
-      if (dist <= TOUCH_HIT_RADIUS) attemptHit();
+
+      // 터치 지점에서 가까운 원 찾기 (반경 TOUCH_HIT_RADIUS 이내)
+      let bestIdx = -1;
+      let bestDist = Infinity;
+      circles.forEach((c, i) => {
+        const dx = x - c.x, dy = y - c.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= TOUCH_HIT_RADIUS && dist < bestDist) {
+          bestDist = dist;
+          bestIdx = i;
+        }
+      });
+
+      if (bestIdx !== -1) attemptHitOn(bestIdx);
     }
 
     // ====== 게임 루프 ======
@@ -210,34 +219,28 @@
 
       // 원 업데이트 & 그리기
       circles.forEach(c => {
-        c.radius += 0.5; // 속도 그대로
+        c.radius += 0.5; // 절반 속도
+        // 실제 원
         ctx.beginPath();
         ctx.setLineDash([]);
         ctx.strokeStyle = "black";
         ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.fillText("r=" + Math.floor(c.radius), c.x + c.radius + 6, c.y);
+
+        // 반지름 값 표시(가까이)
+        ctx.fillText("r=" + Math.floor(c.radius), c.x + c.radius + 3, c.y);
+
+        // 퍼펙트 기준선(각 오브젝트 주위에 1개만) — 빨간 점선, 반지름 TARGET
+        ctx.setLineDash([10 / view.scale, 7 / view.scale]);
+        ctx.strokeStyle = "red";
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, TARGET, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
       });
 
-      circles = circles.filter(c => c.radius <= 120);
-
-
-      // 퍼펙트 범위(초록 점선)
-      ctx.setLineDash([6 / view.scale, 6 / view.scale]);
-      ctx.strokeStyle = "green";
-      ctx.beginPath();
-      ctx.arc(300, 200, PERFECT_MIN, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(300, 200, PERFECT_MAX, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // 타깃(빨간 점선)
-      ctx.setLineDash([10 / view.scale, 7 / view.scale]);
-      ctx.strokeStyle = "red";
-      ctx.beginPath();
-      ctx.arc(300, 200, TARGET, 0, Math.PI * 2);
-      ctx.stroke();
+      // r가 너무 커진 원 제거 (60 초과 제거)
+      circles = circles.filter(c => c.radius <= 60);
 
       requestAnimationFrame(updateGame);
     }
@@ -266,13 +269,16 @@
       document.getElementById("content").innerHTML = `
         <canvas id="gameCanvas"></canvas>
         <p>점수: <span id="score">0</span></p>
-        <p>${id} ${name} 님, 화면 중앙에서 <b>터치</b> 또는 PC는 <b>Space</b>!</p>
+        <p>${id} ${name} 님, 원하는 타이밍에 스폰 함수로 원을 생성하세요.
+           (모바일: 터치 근처 원 판정 / PC: Space)</p>
       `;
 
       gameArea = document.getElementById("gameCanvas");
       ctx = gameArea.getContext("2d");
 
-      gameInterval = setInterval(createCircle, 2000);
+      // ⛔ 자동 스폰 제거됨
+      // gameInterval = setInterval(createCircle, 2000);
+
       resizeCanvas();
       requestAnimationFrame(updateGame);
 
@@ -285,10 +291,10 @@
       window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
     }
 
-    // ====== 데이터 ======
-    function createCircle() {
-      circles.push({ x: 300, y: 200, radius: 10 });
-      circles.push({ x: 300, y: 200, radius: 5 });
+    // ====== 데이터 / API ======
+    // 좌표를 받아 원 생성 (기본값: 중앙)
+    function createCircle(x = 300, y = 200) {
+      circles.push({ x, y, radius: 5 }); // 절반 시작 반지름
     }
 
     function showRanking() {
@@ -297,5 +303,3 @@
   </script>
 </body>
 </html>
-
-
