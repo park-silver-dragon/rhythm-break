@@ -16,23 +16,18 @@
     }
     body { display: flex; flex-direction: column; align-items: center; padding: 16px; }
 
-    /* 타이틀 크게 */
     h1 {
       margin: 12px 0 10px; line-height: 1.2; font-weight: 800;
       font-size: clamp(24px, 7vw, 40px); letter-spacing: -0.02em; text-align: center;
     }
 
-    /* 공용 바 */
     .bar {
       width: 100%; max-width: var(--max-width);
       display: flex; justify-content: center; gap: 12px;
     }
-
-    /* 메인 메뉴: 좌우 배치 + 동일 폭 */
     .bar.menu { flex-wrap: nowrap; }
     .bar.menu > button { flex: 1 1 0; min-width: 0; }
 
-    /* 버튼 크게 + 터치 타깃 확보 */
     button {
       font-size: clamp(16px, 4.5vw, 18px);
       padding: 14px 18px; min-height: 48px;
@@ -41,10 +36,8 @@
     }
     button:active { transform: translateY(1px); }
 
-    /* 컨텐츠 영역 */
     #content { width: 100%; max-width: var(--max-width); margin-top: 12px; }
 
-    /* 입력 UI */
     .input-row { display:flex; align-items:center; justify-content:center; gap:10px; margin: 10px 0; }
     label { font-size: clamp(15px, 4.2vw, 17px); }
     input[type="text"] {
@@ -54,10 +47,8 @@
       border: 1.2px solid #cfcfcf; border-radius: 10px; background: #fff;
     }
 
-    /* 본문 텍스트 */
     p { margin: 10px 0; font-size: clamp(15px, 4.2vw, 17px); text-align:center; }
 
-    /* 캔버스 반응형 */
     canvas {
       width: 100%; max-height: 70vh;
       display: block; margin: 0 auto; border: 1px solid #000;
@@ -74,7 +65,6 @@
 <body>
   <h1>🎵 리듬게임 🎵</h1>
 
-  <!-- 메인 메뉴: 좌우 배치 -->
   <div class="bar menu">
     <button onclick="startGame()">게임 시작</button>
     <button onclick="showRanking()">랭킹 확인</button>
@@ -84,16 +74,10 @@
 
   <script>
     // ====== 전역 상태 ======
-
-    let gameStartAt = 0;                 // 게임 시작 시각(ms)
-
-function getPlayTimeMs() {           // 현재 플레이타임(ms)
-  return performance.now() - gameStartAt;
-}
-
     let gameArea, ctx;
     let score = 0;
     let circles = [];
+    let gameStartAt = 0;
 
     // 논리 좌표(디자인 해상도)
     const DESIGN_W = 600;
@@ -107,14 +91,25 @@ function getPlayTimeMs() {           // 현재 플레이타임(ms)
     // 터치 히트박스 (논리 좌표 기준, 절반 세팅)
     const TOUCH_HIT_RADIUS = 33;
 
+    // 이미지 로드 (리포지토리에 /assets/note.png, /assets/perfect.png 업로드)
+    const imgNote = new Image();
+    imgNote.crossOrigin = "anonymous";
+    imgNote.src = "assets/note.png";
+
+    const imgPerfect = new Image();
+    imgPerfect.crossOrigin = "anonymous";
+    imgPerfect.src = "assets/perfect.png";
+
     // 뷰(스크린 스케일/오프셋) 상태
     const view = { cssW:0, cssH:0, dpr:1, scale:1, offsetX:0, offsetY:0 };
+
+    // ====== 유틸 ======
+    function getPlayTimeMs() { return performance.now() - gameStartAt; }
 
     // ====== 리사이즈 & 스케일링 ======
     function resizeCanvas() {
       if (!gameArea || !ctx) return;
 
-      // 1) CSS 크기 결정 (모바일 우선, 3:2 비율)
       const container = gameArea.parentElement;
       const containerW = container.clientWidth;
       const aspect = DESIGN_H / DESIGN_W; // 400/600
@@ -127,7 +122,6 @@ function getPlayTimeMs() {           // 현재 플레이타임(ms)
 
       view.cssW = cssW; view.cssH = cssH;
 
-      // 2) 실제 캔버스 픽셀 크기 (DPR 반영)
       const dpr = window.devicePixelRatio || 1;
       view.dpr = dpr;
       gameArea.style.width = cssW + "px";
@@ -135,7 +129,6 @@ function getPlayTimeMs() {           // 현재 플레이타임(ms)
       gameArea.width = Math.round(cssW * dpr);
       gameArea.height = Math.round(cssH * dpr);
 
-      // 3) 스케일/오프셋 계산
       const scaleX = cssW / DESIGN_W;
       const scaleY = cssH / DESIGN_H;
       view.scale = Math.min(scaleX, scaleY);
@@ -176,14 +169,14 @@ function getPlayTimeMs() {           // 현재 플레이타임(ms)
 
       score += gained;
       document.getElementById("score").innerText = score;
-      circles.splice(index, 1); // 해당 원 제거
+      circles.splice(index, 1);
     }
 
     // ====== 입력: 키보드(PC 테스트용) ======
     function onKeyDown(e) {
       if (e.code !== "Space") return;
       if (circles.length === 0) return;
-      attemptHitOn(0); // 가장 먼저 뜬 원
+      attemptHitOn(0);
     }
 
     // ====== 입력: 터치/클릭(모바일 우선) ======
@@ -199,7 +192,7 @@ function getPlayTimeMs() {           // 현재 플레이타임(ms)
     function onPointerDown(e) {
       const { x, y } = screenToLogical(e.clientX, e.clientY);
 
-      // 터치 지점에서 가까운 원 찾기 (반경 TOUCH_HIT_RADIUS 이내)
+      // 터치 지점에서 가까운 원 찾기
       let bestIdx = -1;
       let bestDist = Infinity;
       circles.forEach((c, i) => {
@@ -218,47 +211,54 @@ function getPlayTimeMs() {           // 현재 플레이타임(ms)
     function updateGame() {
       clearFrame();
 
-      // === 우측 상단 플레이타임 표시 ===
-      // 선/폰트 보정
+      // 선/폰트 보정 먼저
       const lw = 1 / view.scale;
       ctx.lineWidth = lw;
       ctx.font = `${Math.max(10, Math.floor(12 / view.scale))}px sans-serif`;
 
-      
+      // 우측 상단 플레이타임
       ctx.save();
       ctx.setLineDash([]);
-      ctx.strokeStyle = "black";
       ctx.fillStyle = "black";
       ctx.textAlign = "right";
       ctx.textBaseline = "top";
-
-      // 논리 좌표 기준 오른쪽 여백 8px, 상단 6px
       const tSec = (getPlayTimeMs() / 1000).toFixed(2);
       ctx.fillText(`t=${tSec}s`, DESIGN_W - 8, 6);
       ctx.restore();
-  
 
-      
       // 원 업데이트 & 그리기
       circles.forEach(c => {
         c.radius += 0.5; // 절반 속도
-        // 실제 원
-        ctx.beginPath();
-        ctx.setLineDash([]);
-        ctx.strokeStyle = "black";
-        ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
-        ctx.stroke();
 
-        // 반지름 값 표시(가까이)
+        // 노트 이미지
+        const size = c.radius * 2;
+        if (imgNote.complete && imgNote.naturalWidth > 0) {
+          // 부드럽게 보이도록
+          ctx.imageSmoothingEnabled = true;
+          ctx.drawImage(imgNote, c.x - c.radius, c.y - c.radius, size, size);
+        } else {
+          // 로딩 전 임시 표시
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+          ctx.strokeStyle = "black";
+          ctx.stroke();
+        }
+
+        // 반지름 텍스트(옵션)
         ctx.fillText("r=" + Math.floor(c.radius), c.x + c.radius + 3, c.y);
 
-        // 퍼펙트 기준선(각 오브젝트 주위에 1개만) — 빨간 점선, 반지름 TARGET
-        ctx.setLineDash([10 / view.scale, 7 / view.scale]);
-        ctx.strokeStyle = "red";
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, TARGET, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        // 퍼펙트 기준 링(각 오브젝트마다 1개)
+        const pSize = TARGET * 2;
+        if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
+          ctx.drawImage(imgPerfect, c.x - TARGET, c.y - TARGET, pSize, pSize);
+        } else {
+          ctx.setLineDash([10 / view.scale, 7 / view.scale]);
+          ctx.strokeStyle = "red";
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, TARGET, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
       });
 
       // r가 너무 커진 원 제거 (60 초과 제거)
@@ -300,6 +300,7 @@ function getPlayTimeMs() {           // 현재 플레이타임(ms)
 
       resizeCanvas();
 
+      // 시작 시각을 먼저 기록 → 루프 시작
       gameStartAt = performance.now();
       requestAnimationFrame(updateGame);
 
@@ -311,12 +312,11 @@ function getPlayTimeMs() {           // 현재 플레이타임(ms)
       window.addEventListener("resize", resizeCanvas);
       window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
 
-      // ✅ 예시: 시작 후 5초 뒤 (100,100)에 원 생성
+      // 예시: 시작 후 5초 뒤 (100,100)에 원 생성
       setTimeout(() => createCircle(100, 100), 5000);
     }
 
     // ====== 데이터 / API ======
-    // 좌표를 받아 원 생성 (기본값: 중앙)
     function createCircle(x = 300, y = 200) {
       circles.push({ x, y, radius: 5 }); // 절반 시작 반지름
     }
@@ -327,4 +327,3 @@ function getPlayTimeMs() {           // 현재 플레이타임(ms)
   </script>
 </body>
 </html>
-
