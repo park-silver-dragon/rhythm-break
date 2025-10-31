@@ -570,7 +570,7 @@
     // ✅ 입력 중 덮어쓰기/전체삭제 방지: 모두 유효할 때만 placements 갱신
     function onCodeInput(e) {
       if (updatingCodePanel) return;
-      const lines = e.target.value split(/\r?\n/).map(s => s.trim());
+      const lines = e.target.value.split(/\r?\n/).map(s => s.trim());
       const re = /^setTimeout\(\s*\(\)\s*=>\s*createCircle\(\s*(\d+)\s*,\s*(\d+)\s*\)\s*,\s*(\d+)\s*\)\s*;?$/;
 
       const parsed = [];
@@ -606,3 +606,4 @@
   </script>
 </body>
 </html>
+
