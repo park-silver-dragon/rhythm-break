@@ -91,6 +91,10 @@
     // 터치 히트박스 (논리 좌표 기준, 절반 세팅)
     const TOUCH_HIT_RADIUS = 33;
 
+    // ===== BGM =====
+    let bgm;
+    const BGM_SRC = "assets/Halloween_Night.mp3"; // 음악 파일 경로
+
     // 이미지 로드 (리포지토리에 /assets/note.png, /assets/perfect.png 업로드)
     const imgNote = new Image();
     imgNote.crossOrigin = "anonymous";
@@ -233,7 +237,6 @@
         // 노트 이미지
         const size = c.radius * 2;
         if (imgNote.complete && imgNote.naturalWidth > 0) {
-          // 부드럽게 보이도록
           ctx.imageSmoothingEnabled = true;
           ctx.drawImage(imgNote, c.x - c.radius, c.y - c.radius, size, size);
         } else {
@@ -312,8 +315,31 @@
       window.addEventListener("resize", resizeCanvas);
       window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
 
-      // 예시: 시작 후 5초 뒤 (100,100)에 원 생성
+      // ===== BGM 재생 =====
+      try {
+        bgm = new Audio(BGM_SRC);
+        bgm.loop = true;
+        bgm.volume = 0.8;
+        bgm.currentTime = 0;
+        bgm.play().catch(() => {
+          const unlock = () => {
+            bgm.play().finally(() => gameArea.removeEventListener("pointerdown", unlock));
+          };
+          gameArea.addEventListener("pointerdown", unlock, { once: true });
+        });
+      } catch (e) {
+        console.warn("BGM 재생 실패:", e);
+      }
+
+      // (예시) 시작 5초 후 (100,100)에 원 생성
       setTimeout(() => createCircle(100, 100), 5000);
+
+      // 페이지 가시성 변화 시 BGM 일시정지/재개
+      document.addEventListener("visibilitychange", () => {
+        if (!bgm) return;
+        if (document.hidden) bgm.pause();
+        else bgm.play().catch(()=>{});
+      });
     }
 
     // ====== 데이터 / API ======
