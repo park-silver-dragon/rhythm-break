@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>리듬게임</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <style>
     :root { --max-width: 900px; }
@@ -87,16 +87,15 @@
     let gameArea, ctx;
     let score = 0;
     let circles = [];
-    // let gameInterval; // 자동 스폰 제거로 미사용
 
     // 논리 좌표(디자인 해상도)
     const DESIGN_W = 600;
     const DESIGN_H = 400;
 
     // 판정 상수 (절반 세팅)
-    const TARGET = 35;
-    const PERFECT_MIN = 30;
-    const PERFECT_MAX = 40;
+    const TARGET = 35;      // 퍼펙트 기준 반지름
+    const PERFECT_MIN = 30; // 퍼펙트 하한
+    const PERFECT_MAX = 40; // 퍼펙트 상한
 
     // 터치 히트박스 (논리 좌표 기준, 절반 세팅)
     const TOUCH_HIT_RADIUS = 33;
@@ -276,9 +275,6 @@
       gameArea = document.getElementById("gameCanvas");
       ctx = gameArea.getContext("2d");
 
-      // ⛔ 자동 스폰 제거됨
-      // gameInterval = setInterval(createCircle, 2000);
-
       resizeCanvas();
       requestAnimationFrame(updateGame);
 
@@ -289,6 +285,9 @@
       // 반응형
       window.addEventListener("resize", resizeCanvas);
       window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
+
+      // ✅ 예시: 시작 후 5초 뒤 (100,100)에 원 생성
+      setTimeout(() => createCircle(100, 100), 5000);
     }
 
     // ====== 데이터 / API ======
