@@ -84,6 +84,13 @@
 
   <script>
     // ====== 전역 상태 ======
+
+    let gameStartAt = 0;                 // 게임 시작 시각(ms)
+
+function getPlayTimeMs() {           // 현재 플레이타임(ms)
+  return performance.now() - gameStartAt;
+}
+
     let gameArea, ctx;
     let score = 0;
     let circles = [];
@@ -211,11 +218,27 @@
     function updateGame() {
       clearFrame();
 
+      // === 우측 상단 플레이타임 표시 ===
       // 선/폰트 보정
       const lw = 1 / view.scale;
       ctx.lineWidth = lw;
       ctx.font = `${Math.max(10, Math.floor(12 / view.scale))}px sans-serif`;
 
+      
+      ctx.save();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = "black";
+      ctx.fillStyle = "black";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "top";
+
+      // 논리 좌표 기준 오른쪽 여백 8px, 상단 6px
+      const tSec = (getPlayTimeMs() / 1000).toFixed(2);
+      ctx.fillText(`t=${tSec}s`, DESIGN_W - 8, 6);
+      ctx.restore();
+  
+
+      
       // 원 업데이트 & 그리기
       circles.forEach(c => {
         c.radius += 0.5; // 절반 속도
@@ -276,6 +299,8 @@
       ctx = gameArea.getContext("2d");
 
       resizeCanvas();
+
+      gameStartAt = performance.now();
       requestAnimationFrame(updateGame);
 
       // 입력 등록
@@ -302,3 +327,4 @@
   </script>
 </body>
 </html>
+
