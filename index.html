@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>리듬게임</title>
+  <title>리듬게임 - 개발자 모드 포함</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <style>
@@ -112,7 +112,7 @@
     const PERFECT_MIN = 30; // 퍼펙트 하한
     const PERFECT_MAX = 40; // 퍼펙트 상한
 
-    // 터치 히트박스 (논리 좌표 기준, 절반 세팅)
+    // 터치 히트박스 (논리 좌표 기준)
     const TOUCH_HIT_RADIUS = 33;
 
     // ===== BGM =====
@@ -128,7 +128,7 @@
     imgPerfect.crossOrigin = "anonymous";
     imgPerfect.src = "assets/perfect.png";
 
-    // ===== 배경 레이어 ===== (원하는 v2/v3 파일로 교체 가능)
+    // ===== 배경 레이어 ===== (v3 사용 예시)
     const bgSky    = new Image(); bgSky.src    = "assets/bg_sky.png";
     const bgFar    = new Image(); bgFar.src    = "assets/bg_forest_far_v3.png";
     const bgNear   = new Image(); bgNear.src   = "assets/bg_forest_near_v3.png";
@@ -405,7 +405,6 @@
 
     // ====== 화면 구성 ======
     function startGame() {
-      // 입력 폼
       document.getElementById("content").innerHTML = `
         <div class="input-row">
           <label for="studentId">학번</label>
@@ -534,9 +533,15 @@
 
       refreshCodePanel();
 
-      // 코드 편집 실시간 반영
+      // 코드 편집 실시간 반영 (덮어쓰기 방지 버전)
       const ta = document.getElementById("codeList");
       ta.addEventListener("input", onCodeInput);
+      // 포커스가 빠질 때만 정렬된 형식으로 되돌려 씀
+      ta.addEventListener("blur", () => {
+        updatingCodePanel = true;
+        ta.value = generateCodeText();
+        updatingCodePanel = false;
+      });
     }
 
     let updatingCodePanel = false;
@@ -548,18 +553,26 @@
       updatingCodePanel = false;
     }
 
+    // ✅ 입력 중 덮어쓰기/전체삭제 방지: 모두 유효할 때만 placements 갱신
     function onCodeInput(e) {
       if (updatingCodePanel) return;
-      const lines = e.target.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      const lines = e.target.value.split(/\r?\n/).map(s => s.trim());
       const re = /^setTimeout\(\s*\(\)\s*=>\s*createCircle\(\s*(\d+)\s*,\s*(\d+)\s*\)\s*,\s*(\d+)\s*\)\s*;?$/;
+
       const parsed = [];
+      let allValid = true;
+
       for (const line of lines) {
+        if (!line) continue;                  // 빈 줄은 스킵
         const m = line.match(re);
-        if (m) parsed.push({ x:+m[1], y:+m[2], t:+m[3] });
+        if (!m) { allValid = false; break; }  // 미완성/불일치 → 반영 보류
+        parsed.push({ x:+m[1], y:+m[2], t:+m[3] });
       }
-      if (parsed.length >= 0) {
+
+      if (allValid) {
         placements = parsed;
-        refreshCodePanel(); // 정렬 & 정규화된 포맷으로 즉시 반영
+        sortPlacements();
+        // 여기서 refreshCodePanel() 호출하지 않음 (덮어쓰기 금지)
       }
     }
 
@@ -572,7 +585,7 @@
       document.getElementById("content").innerHTML = `<p>랭킹 기능은 추후 추가 예정</p>`;
     }
 
-    // 초기 상태: 간단 안내
+    // 초기 안내
     document.getElementById("content").innerHTML = `
       <p>좌측 상단의 <b>타일 배치</b>로 배치 모드에 들어가거나, <b>게임 시작</b>으로 테스트하세요.</p>
     `;
