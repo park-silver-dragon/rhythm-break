@@ -1,0 +1,29 @@
+name: Deploy to Firebase Hosting
+
+on:
+  push:
+    branches:
+      - main  # ← 배포할 브랜치
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Build project (optional)
+        run: |
+          echo "No build step needed for static site"
+
+      - name: Deploy to Firebase Hosting
+        run: firebase deploy --token "${{ secrets.FIREBASE_TOKEN }}"
