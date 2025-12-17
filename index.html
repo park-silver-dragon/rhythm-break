@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -79,6 +80,16 @@
       button { padding: 12px 16px; }
       input[type="text"] { width: 420px; }
     }
+
+    /* ✅ 게임/배치 중 스크롤 방지 (모바일 주소창/스크롤로 캔버스 크기 변하는 현상 방지) */
+    body.lock-scroll {
+      position: fixed;
+      left: 0;
+      right: 0;
+      width: 100%;
+      overflow: hidden;
+      touch-action: none;
+    }
   </style>
 </head>
 <body>
@@ -130,6 +141,20 @@
     let gameArea, ctx;
     let score = 0;
     let circles = [];
+
+    // ✅ 스크롤 잠금(모바일에서 위/아래 스크롤로 캔버스가 확대/축소되는 현상 방지)
+    let savedScrollY = 0;
+    function lockScroll() {
+      savedScrollY = window.scrollY || 0;
+      document.body.classList.add("lock-scroll");
+      document.body.style.top = `-${savedScrollY}px`;
+    }
+    function unlockScroll() {
+      document.body.classList.remove("lock-scroll");
+      const y = Math.abs(parseInt(document.body.style.top || "0", 10)) || 0;
+      document.body.style.top = "";
+      window.scrollTo(0, y);
+    }
 
     // 플레이타임
     let gameStartAt = 0;
@@ -399,6 +424,7 @@
 
     // ====== 화면 구성 ======
     function startGame() {
+      unlockScroll(); // ✅ 입력 화면에서는 스크롤 허용
       devMode = false;
       placements = placements || [];
       document.getElementById("content").innerHTML = `
@@ -417,6 +443,9 @@
     }
 
     function gameStart() {
+      // ✅ 게임 캔버스 화면 진입 시 스크롤 고정
+      lockScroll();
+
       const id = (document.getElementById("studentId").value || "").trim();
       const name = (document.getElementById("name").value || "").trim();
 
@@ -461,6 +490,7 @@
     }
 
     function showRanking() {
+      unlockScroll(); // ✅ 랭킹 화면에서는 스크롤 허용
       document.getElementById("content").innerHTML = `<p>랭킹 기능은 추후 추가 예정</p>`;
     }
 
@@ -472,6 +502,9 @@
 
     // ====== 배치 모드 ======
     function enterPlacementMode() {
+      // ✅ 배치 모드도 스크롤 고정(모바일에서 캔버스 들쭉날쭉 방지)
+      lockScroll();
+
       devMode = true;
 
       // 음악/타이머 정지
@@ -529,9 +562,10 @@
 
     function parsePlacementText(text) {
       const out = [];
-      const reLine = /createCircle\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*,\s*(\d+)\s*\)/g;
+      // setTimeout(() => createCircle(x, y), t);
+      const re = /setTimeout\(\(\)\s*=>\s*createCircle\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*,\s*(\d+)\s*\)\s*;/g;
       let m;
-      while ((m = reLine.exec(text)) !== null) {
+      while ((m = re.exec(text)) !== null) {
         out.push({ x: Number(m[1]), y: Number(m[2]), t: Number(m[3]) });
       }
       return out;
@@ -575,3 +609,4 @@
   </script>
 </body>
 </html>
+```
