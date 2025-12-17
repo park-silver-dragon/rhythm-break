@@ -299,6 +299,7 @@ function playSfxStart() {
       if (bgm) {
         try { bgm.pause(); bgm.currentTime = 0; } catch(e) {}
       }
+      playSfxStart();
     }
 
     // ====== 리사이즈 & 스케일링 ======
@@ -508,7 +509,6 @@ function playSfxStart() {
 
             stopAllTimers();
             schedulePlacements();
-            playSfxStart();
 
             try {
               if (bgm) {
@@ -777,4 +777,5 @@ function playSfxStart() {
   </script>
 </body>
 </html>
+
 
