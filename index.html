@@ -185,9 +185,9 @@
     }
 
     // ===== 노트 크기/속도 튜닝 =====
-    const NOTE_START_R = 10;   // 생성 시 반지름
-    const TARGET = 42;         // 퍼펙트 기준 반지름
-    const PERFECT_WINDOW = 6;  // 퍼펙트 허용 오차(±)
+    const NOTE_START_R = 10;
+    const TARGET = 42;
+    const PERFECT_WINDOW = 6;
     const PERFECT_MIN = TARGET - PERFECT_WINDOW;
     const PERFECT_MAX = TARGET + PERFECT_WINDOW;
 
@@ -196,7 +196,7 @@
 
     // 프레임 독립(시간 기반) 성장
     let lastFrameAt = 0;
-    const GROW_PER_SEC = 26;   // ✅ 더 빠르게
+    const GROW_PER_SEC = 26;
 
     // ===== BGM =====
     let bgm;
@@ -219,13 +219,57 @@
 
     // 배경 스크롤(오른쪽으로 이동)
     let bgX1 = 0, bgX2 = 0, bgX3 = 0, bgX4 = 0;
-    const bgSpeed1 = 8;   // sky
-    const bgSpeed2 = 18;  // far
-    const bgSpeed3 = 30;  // near
-    const bgSpeed4 = 42;  // black silhouette(앞 레이어)
+    const bgSpeed1 = 8;
+    const bgSpeed2 = 18;
+    const bgSpeed3 = 30;
+    const bgSpeed4 = 42;
 
     // ===== 뷰(스크린 스케일/오프셋) 상태 =====
     const view = { cssW:0, cssH:0, dpr:1, scale:1, offsetX:0, offsetY:0 };
+
+    // ===== 카운트다운 상태 =====
+    let isPlaying = false;
+    const countdown = { active:false, startAt:0, started:false, startShownUntil:0 };
+    const COUNTDOWN_IDLE_MS = 1000;  // 처음 1초 공백
+    const COUNTDOWN_STEP_MS = 1000;  // 3,2,1 간격
+    const START_FLASH_MS = 650;      // START 표시 시간
+
+    function primeBgm() {
+      try {
+        if (!bgm) bgm = new Audio(BGM_SRC);
+        bgm.loop = true;
+        bgm.volume = 0.5;
+        bgm.currentTime = 0;
+
+        // 사용자 클릭 순간에 권한/로드 확보 시도
+        const p = bgm.play();
+        if (p && typeof p.then === "function") {
+          p.then(() => {
+            bgm.pause();
+            bgm.currentTime = 0;
+          }).catch(()=>{});
+        }
+      } catch(e) {}
+    }
+
+    function startCountdown() {
+      stopAllTimers();
+      circles = [];
+      score = 0;
+      const scoreEl = document.getElementById("score");
+      if (scoreEl) scoreEl.innerText = "0";
+
+      isPlaying = false;
+
+      countdown.active = true;
+      countdown.startAt = performance.now();
+      countdown.started = false;
+      countdown.startShownUntil = 0;
+
+      if (bgm) {
+        try { bgm.pause(); bgm.currentTime = 0; } catch(e) {}
+      }
+    }
 
     // ====== 리사이즈 & 스케일링 ======
     function resizeCanvas() {
@@ -297,6 +341,7 @@
         return;
       }
       if (e.code !== "Space") return;
+      if (!isPlaying) return;
       if (circles.length === 0) return;
       attemptHitOn(0);
     }
@@ -327,6 +372,8 @@
         renderPlacementList();
         return;
       }
+
+      if (!isPlaying) return;
 
       // 게임 모드: 터치 지점에서 가까운 원 찾기
       let bestIdx = -1;
@@ -378,7 +425,6 @@
 
       // ===== 배치모드: 배치된 노트 중심(점) + 퍼펙트 기준 링 반투명 표시 =====
       if (devMode) {
-        // 1) 배치된 중심 점
         ctx.save();
         ctx.fillStyle = "rgba(255,255,255,0.75)";
         for (const p of placements) {
@@ -388,7 +434,6 @@
         }
         ctx.restore();
 
-        // 2) 퍼펙트 기준 링(반투명)
         ctx.save();
         ctx.globalAlpha = 0.22;
         if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
@@ -408,16 +453,69 @@
         ctx.restore();
       }
 
-      // 우측 상단 플레이타임
-      ctx.save();
-      ctx.setLineDash([]);
-      ctx.fillStyle = "white";
-      ctx.textAlign = "right";
-      ctx.textBaseline = "top";
-      ctx.font = `${Math.max(12, Math.floor(14 / view.scale))}px sans-serif`;
-      const tSec = (getPlayTimeMs() / 1000).toFixed(2);
-      ctx.fillText(`t=${tSec}s`, DESIGN_W - 8, 8);
-      ctx.restore();
+      // ===== 카운트다운(게임 모드) =====
+      if (!devMode && countdown.active) {
+        const t = now - countdown.startAt;
+
+        let text = "";
+        if (t < COUNTDOWN_IDLE_MS) {
+          text = "";
+        } else if (t < COUNTDOWN_IDLE_MS + 1 * COUNTDOWN_STEP_MS) {
+          text = "3";
+        } else if (t < COUNTDOWN_IDLE_MS + 2 * COUNTDOWN_STEP_MS) {
+          text = "2";
+        } else if (t < COUNTDOWN_IDLE_MS + 3 * COUNTDOWN_STEP_MS) {
+          text = "1";
+        } else {
+          if (!countdown.started) {
+            countdown.started = true;
+            countdown.startShownUntil = now + START_FLASH_MS;
+
+            // ✅ START 순간: 진짜 게임 시작(스케줄+음악)
+            isPlaying = true;
+            gameStartAt = performance.now();
+            lastFrameAt = now;
+
+            stopAllTimers();
+            schedulePlacements();
+
+            try {
+              if (bgm) {
+                bgm.currentTime = 0;
+                bgm.volume = 0.5;
+                bgm.play().catch(()=>{});
+              }
+            } catch(e) {}
+          }
+          if (now < countdown.startShownUntil) text = "START";
+          else countdown.active = false;
+        }
+
+        if (text) {
+          ctx.save();
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "rgba(255,255,255,0.95)";
+          ctx.shadowColor = "rgba(0,0,0,0.65)";
+          ctx.shadowBlur = 14;
+          ctx.font = "900 140px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+          ctx.fillText(text, CENTER_X(), CENTER_Y());
+          ctx.restore();
+        }
+      }
+
+      // 우측 상단 플레이타임(플레이 중에만)
+      if (!devMode && isPlaying) {
+        ctx.save();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "white";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "top";
+        ctx.font = `${Math.max(12, Math.floor(14 / view.scale))}px sans-serif`;
+        const tSec = (getPlayTimeMs() / 1000).toFixed(2);
+        ctx.fillText(`t=${tSec}s`, DESIGN_W - 8, 8);
+        ctx.restore();
+      }
 
       // 노트 업데이트/그리기 (프레임 독립)
       const grow = GROW_PER_SEC * dtSec;
@@ -425,7 +523,6 @@
       circles.forEach(c => {
         c.radius += grow;
 
-        // 노트 이미지
         if (imgNote.complete && imgNote.naturalWidth > 0) {
           const size = c.radius * 2;
           ctx.drawImage(imgNote, c.x - c.radius, c.y - c.radius, size, size);
@@ -436,7 +533,6 @@
           ctx.stroke();
         }
 
-        // 퍼펙트 기준선(이미지)
         if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
           const sizeP = TARGET * 2;
           ctx.drawImage(imgPerfect, c.x - TARGET, c.y - TARGET, sizeP, sizeP);
@@ -467,9 +563,11 @@
 
     // ====== 화면 구성 ======
     function startGame() {
-      unlockScroll(); // 입력 화면에서는 스크롤 허용
+      unlockScroll();
       devMode = false;
-      placements = placements || [];
+      isPlaying = false;
+      countdown.active = false;
+
       document.getElementById("content").innerHTML = `
         <div class="input-row">
           <label for="studentId">학번</label>
@@ -486,7 +584,7 @@
     }
 
     function gameStart() {
-      lockScroll(); // ✅ 게임 화면에서는 스크롤 고정
+      lockScroll();
 
       const id = (document.getElementById("studentId").value || "").trim();
       const name = (document.getElementById("name").value || "").trim();
@@ -502,23 +600,6 @@
 
       resizeCanvas();
 
-      // BGM
-      try {
-        if (!bgm) bgm = new Audio(BGM_SRC);
-        bgm.loop = true;
-        bgm.volume = 0.5;
-        bgm.currentTime = 0;
-        bgm.play().catch(()=>{});
-      } catch(e) {}
-
-      // 플레이타임
-      gameStartAt = performance.now();
-      lastFrameAt = 0;
-
-      // 배치된 노트 스케줄 실행
-      stopAllTimers();
-      schedulePlacements();
-
       // 입력 등록
       document.addEventListener("keydown", onKeyDown, { passive: true });
       gameArea.addEventListener("pointerdown", onPointerDown, { passive: true });
@@ -528,11 +609,20 @@
       window.addEventListener("resize", resizeCanvas);
       window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
 
+      // ✅ 카운트다운 시작(START 순간에 음악+노트 시작)
+      primeBgm();
+      startCountdown();
+
+      lastFrameAt = 0;
       requestAnimationFrame(updateGame);
     }
 
     function showRanking() {
-      unlockScroll(); // 랭킹 화면에서는 스크롤 허용
+      unlockScroll();
+      devMode = false;
+      isPlaying = false;
+      countdown.active = false;
+
       document.getElementById("content").innerHTML = `<p>랭킹 기능은 추후 추가 예정</p>`;
     }
 
@@ -544,12 +634,15 @@
 
     // ====== 배치 모드 ======
     function enterPlacementMode() {
-      lockScroll(); // ✅ 배치 모드도 스크롤 고정
+      lockScroll();
       devMode = true;
+      isPlaying = false;
+      countdown.active = false;
 
-      // 음악/타이머 정지
       stopAllTimers();
-      if (bgm) { try { bgm.pause(); } catch(e) {} }
+      circles = [];
+
+      if (bgm) { try { bgm.pause(); bgm.currentTime = 0; } catch(e) {} }
 
       document.getElementById("content").innerHTML = `
         <div class="dev-wrap">
@@ -577,7 +670,6 @@
       ctx = gameArea.getContext("2d");
       resizeCanvas();
 
-      // 중앙 기준으로 초기화
       mouse.x = CENTER_X();
       mouse.y = CENTER_Y();
       showGhost = false;
@@ -588,8 +680,6 @@
       gameArea.addEventListener("pointerdown", onPointerDown, { passive: true });
       gameArea.addEventListener("pointermove", onPointerMove, { passive: true });
 
-      // 배치모드에서는 플레이타임 흐르지 않음(표시만 됨)
-      gameStartAt = performance.now();
       lastFrameAt = 0;
       requestAnimationFrame(updateGame);
     }
@@ -610,7 +700,7 @@
       const re = /setTimeout\(\(\)\s*=>\s*createCircle\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*,\s*(?:beatToMs\(\s*)?(\d+(?:\.\d+)?)\s*\)?\s*\)\s*;/g;
       let m;
       while ((m = re.exec(text)) !== null) {
-        out.push({ x: Number(m[1]), y: Number(m[2]), t: Number(m[3]) }); // t = beat
+        out.push({ x: Number(m[1]), y: Number(m[2]), t: Number(m[3]) });
       }
       return out;
     }
