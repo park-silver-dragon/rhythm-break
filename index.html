@@ -199,6 +199,36 @@
     const GROW_PER_SEC = 26;
 
     // ===== BGM =====
+    // ===== START SFX =====
+let sfxStart;
+const SFX_START_SRC = "assets/sfx_start1.mp3";
+
+function primeSfxStart() {
+  try {
+    if (!sfxStart) sfxStart = new Audio(SFX_START_SRC);
+    sfxStart.volume = 1.0;
+    sfxStart.currentTime = 0;
+
+    // 사용자 클릭 순간에 권한/로드 확보
+    const p = sfxStart.play();
+    if (p && typeof p.then === "function") {
+      p.then(() => {
+        sfxStart.pause();
+        sfxStart.currentTime = 0;
+      }).catch(()=>{});
+    }
+  } catch(e) {}
+}
+
+function playSfxStart() {
+  try {
+    if (!sfxStart) sfxStart = new Audio(SFX_START_SRC);
+    sfxStart.volume = 1.0;
+    sfxStart.currentTime = 0;
+    sfxStart.play().catch(()=>{});
+  } catch(e) {}
+}
+
     let bgm;
     const BGM_SRC = "assets/bgm_retro.mp3";
 
@@ -265,7 +295,7 @@
       countdown.startAt = performance.now();
       countdown.started = false;
       countdown.startShownUntil = 0;
-
+      
       if (bgm) {
         try { bgm.pause(); bgm.currentTime = 0; } catch(e) {}
       }
@@ -478,6 +508,7 @@
 
             stopAllTimers();
             schedulePlacements();
+            playSfxStart();
 
             try {
               if (bgm) {
@@ -611,6 +642,7 @@
 
       // ✅ 카운트다운 시작(START 순간에 음악+노트 시작)
       primeBgm();
+      primeSfxStart();
       startCountdown();
 
       lastFrameAt = 0;
@@ -745,3 +777,4 @@
   </script>
 </body>
 </html>
+
