@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>리듬게임 로그</title>
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      margin: 16px;
+      background: #111;
+      color: #eee;
+    }
+    h1 { margin-bottom: 12px; }
+    button {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      margin-right: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      background: #1a1a1a;
+    }
+    th, td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #333;
+      text-align: left;
+      font-size: 14px;
+    }
+    th {
+      background: #222;
+      position: sticky;
+      top: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>📋 리듬게임 점수 로그</h1>
+
+  <div>
+    <button onclick="loadByTime()">최신순</button>
+    <button onclick="loadByScore()">점수순</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>시간</th>
+        <th>학번</th>
+        <th>이름</th>
+        <th>점수</th>
+        <th>플레이타임(s)</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      getDocs,
+      query,
+      orderBy
+    } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBxOnlL3ugTshph4CpWFSkE9BE-qgRgPlQ",
+      authDomain: "rhythm-break.firebaseapp.com",
+      projectId: "rhythm-break",
+      storageBucket: "rhythm-break.firebasestorage.app",
+      messagingSenderId: "355457273272",
+      appId: "1:355457273272:web:04d5594b19c09add22534d"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const rowsEl = document.getElementById("rows");
+
+    function clearRows() {
+      rowsEl.innerHTML = "";
+    }
+
+    function addRow(d) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${d.createdAt?.toDate().toLocaleString()}</td>
+        <td>${d.studentId}</td>
+        <td>${d.name}</td>
+        <td>${d.score}</td>
+        <td>${(d.playTimeMs / 1000).toFixed(2)}</td>
+      `;
+      rowsEl.appendChild(tr);
+    }
+
+    async function loadByTime() {
+      clearRows();
+      const q = query(collection(db, "scores"), orderBy("createdAt", "desc"));
+      const snap = await getDocs(q);
+      snap.forEach(doc => addRow(doc.data()));
+    }
+
+    async function loadByScore() {
+      clearRows();
+      const q = query(collection(db, "scores"), orderBy("score", "desc"));
+      const snap = await getDocs(q);
+      snap.forEach(doc => addRow(doc.data()));
+    }
+
+    // 기본: 최신순
+    loadByTime();
+  </script>
+</body>
+</html>
