@@ -87,6 +87,43 @@
   </div>
 
   <div id="content"></div>
+<!-- 🔥 Firebase / Firestore (점수 저장용) -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBxOnlL3ugTshph4CpWFSkE9BE-qgRgPlQ",
+    authDomain: "rhythm-break.firebaseapp.com",
+    projectId: "rhythm-break",
+    storageBucket: "rhythm-break.firebasestorage.app",
+    messagingSenderId: "355457273272",
+    appId: "1:355457273272:web:04d5594b19c09add22534d",
+    measurementId: "G-RTXSJM3DJN"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // ✅ 점수 저장 함수
+  async function submitScore({ studentId, name, score, playTimeMs }) {
+    await addDoc(collection(db, "scores"), {
+      studentId,
+      name,
+      score,
+      playTimeMs,
+      createdAt: serverTimestamp()
+    });
+  }
+
+  // 콘솔에서 테스트 가능하게 노출
+  window.submitScore = submitScore;
+</script>
 
   <script>
     // ====== 전역 상태 ======
@@ -606,4 +643,5 @@
   </script>
 </body>
 </html>
+
 
