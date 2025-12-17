@@ -80,7 +80,7 @@
       input[type="text"] { width: 420px; }
     }
 
-    /* ✅ 게임/배치 중 스크롤 방지 (모바일 주소창/스크롤로 캔버스 크기 변하는 현상 방지) */
+    /* ✅ 게임/배치 중 스크롤 방지 */
     body.lock-scroll {
       position: fixed;
       left: 0;
@@ -141,7 +141,7 @@
     let score = 0;
     let circles = [];
 
-    // ✅ 스크롤 잠금(모바일에서 위/아래 스크롤로 캔버스가 확대/축소되는 현상 방지)
+    // ✅ 스크롤 잠금/해제(모바일에서 위/아래 스크롤로 캔버스 확대/축소되는 현상 방지)
     let savedScrollY = 0;
     function lockScroll() {
       savedScrollY = window.scrollY || 0;
@@ -161,7 +161,7 @@
 
     // 개발자 배치 모드
     let devMode = false;
-    let placements = [];  // {x, y, t}
+    let placements = [];  // {x, y, t}  (t는 "퍼펙트 중심" 시간 ms)
     let activeTimers = [];
     let showGhost = false;
 
@@ -175,13 +175,19 @@
     // 마우스/고스트 초기 위치(중앙)
     const mouse = { x: CENTER_X(), y: CENTER_Y() };
 
-    // 판정 상수
-    const TARGET = 35;
-    const PERFECT_MIN = 30;
-    const PERFECT_MAX = 40;
+    // ===== 노트 크기/속도 튜닝 =====
+    const NOTE_START_R = 10;   // 생성 시 반지름(전체적으로 조금 키움)
+    const TARGET = 42;         // 퍼펙트 기준 반지름(전체적으로 조금 키움)
+    const PERFECT_WINDOW = 6;  // 퍼펙트 허용 오차(±)
+    const PERFECT_MIN = TARGET - PERFECT_WINDOW;
+    const PERFECT_MAX = TARGET + PERFECT_WINDOW;
 
     // 터치 히트박스(논리 좌표 기준)
-    const TOUCH_HIT_RADIUS = 33;
+    const TOUCH_HIT_RADIUS = 40;
+
+    // 프레임 독립(시간 기반) 성장
+    let lastFrameAt = 0;
+    const GROW_PER_SEC = 26;   // ✅ 더 빠르게 (이전 18px/s -> 26px/s)
 
     // ===== BGM =====
     let bgm;
@@ -211,10 +217,6 @@
 
     // ===== 뷰(스크린 스케일/오프셋) 상태 =====
     const view = { cssW:0, cssH:0, dpr:1, scale:1, offsetX:0, offsetY:0 };
-
-    // 프레임 독립(시간 기반) 성장
-    let lastFrameAt = 0;
-    const GROW_PER_SEC = 0.3 * 60; // 예전 0.3/프레임(60fps 기준)과 비슷하게: 초당 18px
 
     // ====== 리사이즈 & 스케일링 ======
     function resizeCanvas() {
@@ -364,6 +366,38 @@
       bgX3 = drawScrollingLayer(bgNear, bgX3, bgSpeed3, dtSec);
       bgX4 = drawScrollingLayer(bgBlack,bgX4, bgSpeed4, dtSec);
 
+      // ===== 배치모드: 배치된 노트 중심(점) + 퍼펙트 기준 링 반투명 표시 =====
+      if (devMode) {
+        // 1) 배치된 중심 점
+        ctx.save();
+        ctx.fillStyle = "rgba(255,255,255,0.75)";
+        for (const p of placements) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+
+        // 2) 퍼펙트 기준 링(반투명)
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
+          const sizeP = TARGET * 2;
+          for (const p of placements) {
+            ctx.drawImage(imgPerfect, p.x - TARGET, p.y - TARGET, sizeP, sizeP);
+          }
+        } else {
+          ctx.strokeStyle = "white";
+          ctx.setLineDash([10 / view.scale, 8 / view.scale]);
+          for (const p of placements) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, TARGET, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+      }
+
       // 우측 상단 플레이타임
       ctx.save();
       ctx.setLineDash([]);
@@ -407,8 +441,8 @@
         }
       });
 
-      // 너무 커지면 제거
-      circles = circles.filter(c => c.radius <= 60);
+      // 너무 커지면 제거(조금 더 여유)
+      circles = circles.filter(c => c.radius <= 85);
 
       // 배치모드 고스트
       if (devMode && showGhost && imgNote.complete && imgNote.naturalWidth > 0) {
@@ -423,7 +457,7 @@
 
     // ====== 화면 구성 ======
     function startGame() {
-      unlockScroll(); // ✅ 입력 화면에서는 스크롤 허용
+      unlockScroll(); // 입력 화면에서는 스크롤 허용
       devMode = false;
       placements = placements || [];
       document.getElementById("content").innerHTML = `
@@ -442,8 +476,7 @@
     }
 
     function gameStart() {
-      // ✅ 게임 캔버스 화면 진입 시 스크롤 고정
-      lockScroll();
+      lockScroll(); // ✅ 게임 화면에서는 스크롤 고정
 
       const id = (document.getElementById("studentId").value || "").trim();
       const name = (document.getElementById("name").value || "").trim();
@@ -459,7 +492,7 @@
 
       resizeCanvas();
 
-      // BGM (자동재생 제한 때문에, 첫 상호작용 뒤 재생되는 환경도 있음)
+      // BGM
       try {
         if (!bgm) bgm = new Audio(BGM_SRC);
         bgm.loop = true;
@@ -489,20 +522,19 @@
     }
 
     function showRanking() {
-      unlockScroll(); // ✅ 랭킹 화면에서는 스크롤 허용
+      unlockScroll(); // 랭킹 화면에서는 스크롤 허용
       document.getElementById("content").innerHTML = `<p>랭킹 기능은 추후 추가 예정</p>`;
     }
 
     // ====== 데이터 / API ======
     function createCircle(x = CENTER_X(), y = CENTER_Y()) {
-      circles.push({ x, y, radius: 5 });
+      circles.push({ x, y, radius: NOTE_START_R });
     }
     window.createCircle = createCircle;
 
     // ====== 배치 모드 ======
     function enterPlacementMode() {
-      // ✅ 배치 모드도 스크롤 고정(모바일에서 캔버스 들쭉날쭉 방지)
-      lockScroll();
+      lockScroll(); // ✅ 배치 모드도 스크롤 고정
 
       devMode = true;
 
@@ -516,12 +548,13 @@
             <canvas id="gameCanvas"></canvas>
             <p class="hint">
               배치 모드: <b>K</b> 를 누르면 고스트가 따라옵니다. 고스트가 켜진 상태에서 <b>클릭</b>하면 배치됩니다.<br>
-              라인 편집 시 즉시 반영됩니다. 예) <code>setTimeout(() => createCircle(CENTER_X(), CENTER_Y()), 1500);</code>
+              라인 편집 시 즉시 반영됩니다. 예) <code>setTimeout(() => createCircle(CENTER_X(), CENTER_Y()), 1500);</code><br>
+              <small style="color:#aaa;">※ t는 "퍼펙트 중심(TARGET)이 되는 시점(ms)" 입니다.</small>
             </p>
           </div>
           <div class="panel-col">
             <h2>코드 목록</h2>
-            <small>t는 ms 기준. 기본값 99999. (시간은 직접 수정)</small>
+            <small>t는 ms 기준(퍼펙트 중심 시각). 기본값 99999. (시간은 직접 수정)</small>
             <textarea id="placementText"></textarea>
             <div class="bar" style="margin-top:10px;">
               <button onclick="applyPlacementText()">적용</button>
@@ -594,11 +627,12 @@
     }
 
     function schedulePlacements() {
-      // 게임 시작 시각 기준
-      const base = performance.now();
+      // t는 "퍼펙트 중심(TARGET)이 되는 시점(ms)" 이다.
+      const leadMs = ((TARGET - NOTE_START_R) / GROW_PER_SEC) * 1000;
+
       placements.forEach(p => {
-        const delay = Math.max(0, p.t);
-        const id = setTimeout(() => createCircle(p.x, p.y), delay);
+        const spawnDelay = Math.max(0, p.t - leadMs);
+        const id = setTimeout(() => createCircle(p.x, p.y), spawnDelay);
         activeTimers.push(id);
       });
     }
@@ -608,4 +642,3 @@
   </script>
 </body>
 </html>
-
