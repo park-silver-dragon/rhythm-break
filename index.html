@@ -161,7 +161,7 @@
 
     // 개발자 배치 모드
     let devMode = false;
-    let placements = [];  // {x, y, t}  (t는 "퍼펙트 중심" 시간 ms)
+    let placements = [];  // {x, y, t} (t는 beat)
     let activeTimers = [];
     let showGhost = false;
 
@@ -175,9 +175,18 @@
     // 마우스/고스트 초기 위치(중앙)
     const mouse = { x: CENTER_X(), y: CENTER_Y() };
 
+    // ===== 박자(beat) 기반 배치 =====
+    const BPM = 140;
+    const MS_PER_BEAT = 60000 / BPM; // 1 beat = 428.571...ms
+    function beatToMs(beat) { return beat * MS_PER_BEAT; }
+    function formatBeat(b) {
+      if (Number.isInteger(b)) return String(b);
+      return String(Number(b.toFixed(3)));
+    }
+
     // ===== 노트 크기/속도 튜닝 =====
-    const NOTE_START_R = 10;   // 생성 시 반지름(전체적으로 조금 키움)
-    const TARGET = 42;         // 퍼펙트 기준 반지름(전체적으로 조금 키움)
+    const NOTE_START_R = 10;   // 생성 시 반지름
+    const TARGET = 42;         // 퍼펙트 기준 반지름
     const PERFECT_WINDOW = 6;  // 퍼펙트 허용 오차(±)
     const PERFECT_MIN = TARGET - PERFECT_WINDOW;
     const PERFECT_MAX = TARGET + PERFECT_WINDOW;
@@ -187,12 +196,11 @@
 
     // 프레임 독립(시간 기반) 성장
     let lastFrameAt = 0;
-    const GROW_PER_SEC = 26;   // ✅ 더 빠르게 (이전 18px/s -> 26px/s)
+    const GROW_PER_SEC = 26;   // ✅ 더 빠르게
 
     // ===== BGM =====
     let bgm;
     const BGM_SRC = "assets/bgm_retro.mp3";
-
 
     // ===== 노트/퍼펙트 이미지 =====
     const imgNote = new Image();
@@ -203,19 +211,18 @@
     imgPerfect.crossOrigin = "anonymous";
     imgPerfect.src = "assets/perfect.png";
 
-    // ===== 배경(현재는 기존 레이어 그대로 / 나중에 도시로 교체) =====
+    // ===== 배경(도시 레이어) =====
     const bgSky = new Image();   bgSky.src = "assets/bg_city_sky.png";
     const bgFar = new Image();   bgFar.src = "assets/bg_city_far.png";
     const bgNear = new Image();  bgNear.src = "assets/bg_city_near.png";
     const bgBlack = new Image(); bgBlack.src = "assets/bg_city_black.png";
-
 
     // 배경 스크롤(오른쪽으로 이동)
     let bgX1 = 0, bgX2 = 0, bgX3 = 0, bgX4 = 0;
     const bgSpeed1 = 8;   // sky
     const bgSpeed2 = 18;  // far
     const bgSpeed3 = 30;  // near
-    const bgSpeed4 = 42;  // black silhouette
+    const bgSpeed4 = 42;  // black silhouette(앞 레이어)
 
     // ===== 뷰(스크린 스케일/오프셋) 상태 =====
     const view = { cssW:0, cssH:0, dpr:1, scale:1, offsetX:0, offsetY:0 };
@@ -278,7 +285,8 @@
       if (index < 0 || index >= circles.length) return;
       const c = circles[index];
       score += judgeRadius(c.radius);
-      document.getElementById("score").innerText = score;
+      const scoreEl = document.getElementById("score");
+      if (scoreEl) scoreEl.innerText = score;
       circles.splice(index, 1);
     }
 
@@ -314,7 +322,7 @@
 
       if (devMode) {
         if (!showGhost) return;
-        placements.push({ x: Math.round(x), y: Math.round(y), t: 99999 });
+        placements.push({ x: Math.round(x), y: Math.round(y), t: 999 }); // t는 beat
         sortPlacements();
         renderPlacementList();
         return;
@@ -443,7 +451,7 @@
         }
       });
 
-      // 너무 커지면 제거(조금 더 여유)
+      // 너무 커지면 제거(여유)
       circles = circles.filter(c => c.radius <= 85);
 
       // 배치모드 고스트
@@ -537,7 +545,6 @@
     // ====== 배치 모드 ======
     function enterPlacementMode() {
       lockScroll(); // ✅ 배치 모드도 스크롤 고정
-
       devMode = true;
 
       // 음악/타이머 정지
@@ -550,13 +557,13 @@
             <canvas id="gameCanvas"></canvas>
             <p class="hint">
               배치 모드: <b>K</b> 를 누르면 고스트가 따라옵니다. 고스트가 켜진 상태에서 <b>클릭</b>하면 배치됩니다.<br>
-              라인 편집 시 즉시 반영됩니다. 예) <code>setTimeout(() => createCircle(CENTER_X(), CENTER_Y()), 1500);</code><br>
-              <small style="color:#aaa;">※ t는 "퍼펙트 중심(TARGET)이 되는 시점(ms)" 입니다.</small>
+              라인 편집 시 즉시 반영됩니다. 예) <code>setTimeout(() => createCircle(CENTER_X(), CENTER_Y()), beatToMs(6.5));</code><br>
+              <small style="color:#aaa;">※ 괄호 안 숫자(6.5)가 "박자(beat)" 입니다. (BPM=${BPM})</small>
             </p>
           </div>
           <div class="panel-col">
             <h2>코드 목록</h2>
-            <small>t는 ms 기준(퍼펙트 중심 시각). 기본값 99999. (시간은 직접 수정)</small>
+            <small>t는 박자(beat) 기준. 기본값 999. (괄호 안 숫자만 수정)</small>
             <textarea id="placementText"></textarea>
             <div class="bar" style="margin-top:10px;">
               <button onclick="applyPlacementText()">적용</button>
@@ -581,7 +588,7 @@
       gameArea.addEventListener("pointerdown", onPointerDown, { passive: true });
       gameArea.addEventListener("pointermove", onPointerMove, { passive: true });
 
-      // 배치모드에서는 플레이타임 흐르지 않음
+      // 배치모드에서는 플레이타임 흐르지 않음(표시만 됨)
       gameStartAt = performance.now();
       lastFrameAt = 0;
       requestAnimationFrame(updateGame);
@@ -590,17 +597,20 @@
     function renderPlacementList() {
       const ta = document.getElementById("placementText");
       if (!ta) return;
-      const lines = placements.map(p => `setTimeout(() => createCircle(${p.x}, ${p.y}), ${p.t});`);
+      const lines = placements.map(p =>
+        `setTimeout(() => createCircle(${p.x}, ${p.y}), beatToMs(${formatBeat(p.t)}));`
+      );
       ta.value = lines.join("\n");
     }
 
     function parsePlacementText(text) {
       const out = [];
-      // setTimeout(() => createCircle(x, y), t);
-      const re = /setTimeout\(\(\)\s*=>\s*createCircle\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*,\s*(\d+)\s*\)\s*;/g;
+      // setTimeout(() => createCircle(x, y), beatToMs(t));
+      // 또는 setTimeout(() => createCircle(x, y), t);  (t는 beat로 간주)
+      const re = /setTimeout\(\(\)\s*=>\s*createCircle\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*,\s*(?:beatToMs\(\s*)?(\d+(?:\.\d+)?)\s*\)?\s*\)\s*;/g;
       let m;
       while ((m = re.exec(text)) !== null) {
-        out.push({ x: Number(m[1]), y: Number(m[2]), t: Number(m[3]) });
+        out.push({ x: Number(m[1]), y: Number(m[2]), t: Number(m[3]) }); // t = beat
       }
       return out;
     }
@@ -629,11 +639,12 @@
     }
 
     function schedulePlacements() {
-      // t는 "퍼펙트 중심(TARGET)이 되는 시점(ms)" 이다.
+      // t는 "퍼펙트 중심(TARGET)이 되는 시점"의 박자(beat)
       const leadMs = ((TARGET - NOTE_START_R) / GROW_PER_SEC) * 1000;
 
       placements.forEach(p => {
-        const spawnDelay = Math.max(0, p.t - leadMs);
+        const perfectMs = beatToMs(p.t);
+        const spawnDelay = Math.max(0, perfectMs - leadMs);
         const id = setTimeout(() => createCircle(p.x, p.y), spawnDelay);
         activeTimers.push(id);
       });
@@ -644,5 +655,3 @@
   </script>
 </body>
 </html>
-
-
