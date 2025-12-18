@@ -184,7 +184,7 @@ setTimeout(() => createCircle(460, 333), beatToMs(44));
 setTimeout(() => createCircle(460, 448), beatToMs(45));
 setTimeout(() => createCircle(460, 535), beatToMs(46));
 setTimeout(() => createCircle(460, 635), beatToMs(47.5));
-setTimeout(() => createCircle(460, 725), beatToMs(48));
+setTimeout(() => createCircle(460, 7), beatToMs(48));
 setTimeout(() => createCircle(80, 897), beatToMs(49));
 setTimeout(() => createCircle(80, 781), beatToMs(50));
 setTimeout(() => createCircle(80, 669), beatToMs(51));
@@ -420,12 +420,13 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     const PERFECT_MIN = TARGET - PERFECT_WINDOW;
     const PERFECT_MAX = TARGET + PERFECT_WINDOW;
     const TOUCH_HIT_RADIUS = 40;
+    const GOOD_WINDOW = 16; // 기존 체감(±25) → 조금 좁힘(±16)
 
     const GROW_PER_SEC = 26;
 
     function judge(r) {
       if (r > PERFECT_MIN && r < PERFECT_MAX) return { type: "perfect", pts: 100 };
-      if (Math.abs(r - TARGET) < 25)          return { type: "good",    pts: 50 };
+     if (Math.abs(r - TARGET) <= GOOD_WINDOW) return { type: "good", pts: 50 };
       return { type: "miss", pts: 10 }; // 원하면 0으로 바꿔도 됨
     }
 
@@ -1037,4 +1038,5 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
   </script>
 </body>
 </html>
+
 
