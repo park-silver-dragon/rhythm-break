@@ -177,14 +177,14 @@
 
     // ===== 박자(beat) 기반 배치 =====
     const BPM = 140;
-    const MS_PER_BEAT = 60000 / BPM; // 1 beat = 428.571...ms
+    const MS_PER_BEAT = 60000 / BPM;
     function beatToMs(beat) { return beat * MS_PER_BEAT; }
     function formatBeat(b) {
       if (Number.isInteger(b)) return String(b);
       return String(Number(b.toFixed(3)));
     }
 
-    // ===== 노트 크기/속도 튜닝 =====
+    // ===== 노트 크기/속도 =====
     const NOTE_START_R = 10;
     const TARGET = 42;
     const PERFECT_WINDOW = 6;
@@ -193,11 +193,10 @@
 
     const TOUCH_HIT_RADIUS = 40;
 
-    // 프레임 독립(시간 기반) 성장
     let lastFrameAt = 0;
     const GROW_PER_SEC = 26;
 
-    // ===== 퍼펙트 링만 0.5초 먼저 보여주기 =====
+    // ===== 퍼펙트 링 0.5초 미리 =====
     const PRE_RING_MS = 500;
     let prePerfectRings = []; // {x, y, until}
     function addPrePerfectRing(x, y) {
@@ -213,7 +212,6 @@
 
     // ===== COUNTDOWN TICK SFX (틱 1개짜리) =====
     // assets/kick.mp3 로 넣어줘
-    let sfxTick;
     const SFX_TICK_SRC = "assets/kick.mp3";
 
     function primeBgm() {
@@ -232,30 +230,18 @@
 
     function primeTick() {
       try {
-        if (!sfxTick) sfxTick = new Audio(SFX_TICK_SRC);
-
-        const prevVol = (typeof sfxTick.volume === "number") ? sfxTick.volume : 1.0;
-        sfxTick.volume = 0;          // 프라임 중 무음
-        sfxTick.currentTime = 0;
-
-        const p = sfxTick.play();
+        const a = new Audio(SFX_TICK_SRC);
+        a.volume = 0;
+        a.currentTime = 0;
+        const p = a.play();
         if (p && typeof p.then === "function") {
-          p.then(() => {
-            sfxTick.pause();
-            sfxTick.currentTime = 0;
-            sfxTick.volume = prevVol || 1.0;
-          }).catch(()=>{ sfxTick.volume = prevVol || 1.0; });
-        } else {
-          sfxTick.pause();
-          sfxTick.currentTime = 0;
-          sfxTick.volume = prevVol || 1.0;
+          p.then(() => { a.pause(); a.currentTime = 0; }).catch(()=>{});
         }
       } catch(e) {}
     }
 
     function playTick() {
       try {
-        // 빠르게 연타될 수 있어서 clone으로 안정 재생
         const a = new Audio(SFX_TICK_SRC);
         a.volume = 1.0;
         a.currentTime = 0;
@@ -271,6 +257,26 @@
     const imgPerfect = new Image();
     imgPerfect.crossOrigin = "anonymous";
     imgPerfect.src = "assets/perfect.png";
+
+    // ✅ 퍼펙트 링 렌더러(미리 링/노트 링 동일한 색으로 통일)
+    function drawPerfectRingAt(x, y, alpha = 1.0) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+
+      if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
+        const sizeP = TARGET * 2;
+        ctx.drawImage(imgPerfect, x - TARGET, y - TARGET, sizeP, sizeP);
+      } else {
+        // 이미지 로딩 전에도 "같은 색" 느낌으로: 빨강 점선
+        ctx.strokeStyle = "red";
+        ctx.setLineDash([10 / view.scale, 7 / view.scale]);
+        ctx.beginPath();
+        ctx.arc(x, y, TARGET, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
 
     // ===== 배경(도시 레이어) =====
     const bgSky = new Image();   bgSky.src = "assets/bg_city_sky.png";
@@ -294,13 +300,13 @@
       startAt:0,
       started:false,
       startShownUntil:0,
-      tickStage:0 // 0=아직, 1=3 재생됨, 2=2 재생됨, 3=1 재생됨
+      tickStage:0
     };
     const COUNTDOWN_IDLE_MS = 1000;
     const COUNTDOWN_STEP_MS = 1000;
     const START_FLASH_MS = 650;
 
-    // ===== 리스너 관리(중복 방지) =====
+    // ===== 리스너 중복 방지 =====
     let resizeBound = false;
     function attachResizeOnce() {
       if (resizeBound) return;
@@ -320,7 +326,6 @@
       gameArea.addEventListener("pointermove", onPointerMove, { passive: true });
     }
 
-    // 키보드는 문서 1회만(중복 방지)
     let keyBound = false;
     function attachKeyOnce() {
       if (keyBound) return;
@@ -345,7 +350,6 @@
       countdown.tickStage = 0;
 
       if (bgm) { try { bgm.pause(); bgm.currentTime = 0; } catch(e) {} }
-      if (sfxTick) { try { sfxTick.pause(); sfxTick.currentTime = 0; } catch(e) {} }
     }
 
     // ====== 리사이즈 & 스케일링 ======
@@ -395,7 +399,7 @@
       applyViewTransform();
     }
 
-    // ====== 공용 판정 처리 ======
+    // ====== 판정 ======
     function judgeRadius(r) {
       if (r > PERFECT_MIN && r < PERFECT_MAX) return 100;
       if (Math.abs(r - TARGET) < 25) return 50;
@@ -464,7 +468,7 @@
       if (bestIdx !== -1) attemptHitOn(bestIdx);
     }
 
-    // ====== 배경 그리기(오른쪽 이동) ======
+    // ====== 배경 ======
     function drawScrollingLayer(img, xOffset, speedPxPerSec, dtSec) {
       if (!img || !img.complete || img.naturalWidth === 0) return xOffset;
 
@@ -499,34 +503,15 @@
       bgX3 = drawScrollingLayer(bgNear, bgX3, bgSpeed3, dtSec);
       bgX4 = drawScrollingLayer(bgBlack,bgX4, bgSpeed4, dtSec);
 
-      // ===== 게임모드: 퍼펙트 링만 0.5초 먼저 표시 =====
+      // ===== 게임모드: 미리 퍼펙트 링(색 동일) =====
       if (!devMode) {
         prePerfectRings = prePerfectRings.filter(r => r.until > now);
-
-        if (prePerfectRings.length) {
-          ctx.save();
-          ctx.globalAlpha = 0.35;
-
-          if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
-            const sizeP = TARGET * 2;
-            for (const r of prePerfectRings) {
-              ctx.drawImage(imgPerfect, r.x - TARGET, r.y - TARGET, sizeP, sizeP);
-            }
-          } else {
-            ctx.strokeStyle = "white";
-            ctx.setLineDash([10 / view.scale, 8 / view.scale]);
-            for (const r of prePerfectRings) {
-              ctx.beginPath();
-              ctx.arc(r.x, r.y, TARGET, 0, Math.PI * 2);
-              ctx.stroke();
-            }
-          }
-
-          ctx.restore();
+        for (const r of prePerfectRings) {
+          drawPerfectRingAt(r.x, r.y, 1.0); // ✅ 원래 링과 동일한 색/강도로
         }
       }
 
-      // ===== 배치모드: 배치된 중심 점 + 퍼펙트 링 반투명 =====
+      // ===== 배치모드: 점 + 링(반투명) =====
       if (devMode) {
         ctx.save();
         ctx.fillStyle = "rgba(255,255,255,0.75)";
@@ -537,32 +522,17 @@
         }
         ctx.restore();
 
-        ctx.save();
-        ctx.globalAlpha = 0.22;
-        if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
-          const sizeP = TARGET * 2;
-          for (const p of placements) {
-            ctx.drawImage(imgPerfect, p.x - TARGET, p.y - TARGET, sizeP, sizeP);
-          }
-        } else {
-          ctx.strokeStyle = "white";
-          ctx.setLineDash([10 / view.scale, 8 / view.scale]);
-          for (const p of placements) {
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, TARGET, 0, Math.PI * 2);
-            ctx.stroke();
-          }
+        for (const p of placements) {
+          drawPerfectRingAt(p.x, p.y, 0.22);
         }
-        ctx.restore();
       }
 
-      // ===== 카운트다운(게임 모드) + 3/2/1에 맞춰 틱 재생 =====
+      // ===== 카운트다운 + 3/2/1 틱 =====
       if (!devMode && countdown.active) {
         const t = now - countdown.startAt;
 
-        // 3~1 구간에서 1초마다 정확히 1번씩 틱
         if (t >= COUNTDOWN_IDLE_MS && t < COUNTDOWN_IDLE_MS + 3 * COUNTDOWN_STEP_MS) {
-          const phase = t - COUNTDOWN_IDLE_MS;              // 0~2999...
+          const phase = t - COUNTDOWN_IDLE_MS;
           const stage = Math.floor(phase / COUNTDOWN_STEP_MS); // 0(3),1(2),2(1)
           while (countdown.tickStage <= stage && countdown.tickStage < 3) {
             playTick();
@@ -571,20 +541,16 @@
         }
 
         let text = "";
-        if (t < COUNTDOWN_IDLE_MS) {
-          text = "";
-        } else if (t < COUNTDOWN_IDLE_MS + 1 * COUNTDOWN_STEP_MS) {
-          text = "3";
-        } else if (t < COUNTDOWN_IDLE_MS + 2 * COUNTDOWN_STEP_MS) {
-          text = "2";
-        } else if (t < COUNTDOWN_IDLE_MS + 3 * COUNTDOWN_STEP_MS) {
-          text = "1";
-        } else {
+        if (t < COUNTDOWN_IDLE_MS) text = "";
+        else if (t < COUNTDOWN_IDLE_MS + 1 * COUNTDOWN_STEP_MS) text = "3";
+        else if (t < COUNTDOWN_IDLE_MS + 2 * COUNTDOWN_STEP_MS) text = "2";
+        else if (t < COUNTDOWN_IDLE_MS + 3 * COUNTDOWN_STEP_MS) text = "1";
+        else {
           if (!countdown.started) {
             countdown.started = true;
             countdown.startShownUntil = now + START_FLASH_MS;
 
-            // START 순간: 진짜 게임 시작(스케줄 + BGM)
+            // START 순간: 게임 시작
             isPlaying = true;
             gameStartAt = performance.now();
             lastFrameAt = now;
@@ -617,7 +583,7 @@
         }
       }
 
-      // 우측 상단 플레이타임(플레이 중에만)
+      // ===== 플레이타임 =====
       if (!devMode && isPlaying) {
         ctx.save();
         ctx.setLineDash([]);
@@ -630,13 +596,13 @@
         ctx.restore();
       }
 
-      // 노트 업데이트/그리기
+      // ===== 노트 업데이트/그리기 =====
       const grow = GROW_PER_SEC * dtSec;
 
       circles.forEach(c => {
         c.radius += grow;
 
-        // 노트 이미지
+        // 노트만 그림(✅ 원래 퍼펙트 링은 여기서 더 이상 그리지 않음)
         if (imgNote.complete && imgNote.naturalWidth > 0) {
           const size = c.radius * 2;
           ctx.drawImage(imgNote, c.x - c.radius, c.y - c.radius, size, size);
@@ -646,21 +612,12 @@
           ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
           ctx.stroke();
         }
-
-        // 퍼펙트 기준 링(기존)
-        if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
-          const sizeP = TARGET * 2;
-          ctx.drawImage(imgPerfect, c.x - TARGET, c.y - TARGET, sizeP, sizeP);
-        } else {
-          ctx.save();
-          ctx.setLineDash([10 / view.scale, 7 / view.scale]);
-          ctx.strokeStyle = "red";
-          ctx.beginPath();
-          ctx.arc(c.x, c.y, TARGET, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.restore();
-        }
       });
+
+      // ✅ 노트 위에 퍼펙트 링(색 통일) — "원래 퍼펙트 링" 경로를 이걸로 대체
+      for (const c of circles) {
+        drawPerfectRingAt(c.x, c.y, 1.0);
+      }
 
       circles = circles.filter(c => c.radius <= 85);
 
@@ -707,7 +664,6 @@
       const id = (document.getElementById("studentId").value || "").trim();
       const name = (document.getElementById("name").value || "").trim();
 
-      // 이전 캔버스 리스너 정리
       detachCanvasListeners();
 
       document.getElementById("content").innerHTML = `
@@ -724,7 +680,6 @@
       attachResizeOnce();
       attachKeyOnce();
 
-      // ✅ 카운트다운 시작(3/2/1 틱 / START 순간 BGM)
       primeBgm();
       primeTick();
       startCountdown();
@@ -750,7 +705,7 @@
 
     // ====== 데이터 / API ======
     function createCircle(x = CENTER_X(), y = CENTER_Y()) {
-      // 같은 좌표에 “미리 링”이 있으면 중복 방지로 제거
+      // ✅ 미리 링이 남아있으면 즉시 제거(겹쳐서 더 빨갛게 보이는 현상 방지)
       removePrePerfectRingAt(x, y);
       circles.push({ x, y, radius: NOTE_START_R });
     }
@@ -769,7 +724,6 @@
 
       if (bgm) { try { bgm.pause(); bgm.currentTime = 0; } catch(e) {} }
 
-      // 이전 캔버스 리스너 정리
       detachCanvasListeners();
 
       document.getElementById("content").innerHTML = `
