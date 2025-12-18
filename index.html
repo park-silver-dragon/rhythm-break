@@ -436,6 +436,22 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     const imgJudgePerfect = new Image(); imgJudgePerfect.src = "assets/judge_perfect.png";
     const imgJudgeGood    = new Image(); imgJudgeGood.src    = "assets/good.png";
     const imgJudgeMiss    = new Image(); imgJudgeMiss.src    = "assets/miss.png";
+    // ✅ 터치 이펙트(별)
+const imgStar = new Image(); imgStar.src = "assets/star.png";
+
+let starPopups = []; // {x,y,img,born,life,size}
+const STAR_LIFE_MS = 380;
+
+function addStarPopup(x, y, size = TARGET * 2) {
+  starPopups.push({
+    x, y,
+    img: imgStar,
+    born: performance.now(),
+    life: STAR_LIFE_MS,
+    size
+  });
+}
+
 
     let judgePopups = []; // {x,y,img,born,life,size}
     const POPUP_LIFE_MS = 450;
@@ -694,15 +710,20 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     }
 
     function applyJudgeAndRemove(index) {
-      const c = circles[index];
-      const j = judge(c.radius);
+  const c = circles[index];
 
-      score += j.pts;
-      setTopScore(score);
+  // ✅ 터치한 순간 별 이펙트
+  addStarPopup(c.x, c.y, TARGET * 2);
 
-      addJudgePopup(j.type, c.x, c.y);
-      removeCircleAt(index);
-    }
+  const j = judge(c.radius);
+
+  score += j.pts;
+  setTopScore(score);
+
+  addJudgePopup(j.type, c.x, c.y);
+  removeCircleAt(index);
+}
+
 
     function attemptHitAt(x, y) {
       if (!isPlaying) return;
@@ -923,6 +944,21 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
           removeCircleAt(i);
         }
       }
+      // ✅ 별 팝업
+const nowMs = performance.now();
+starPopups = starPopups.filter(p => nowMs - p.born < p.life);
+
+for (const p of starPopups) {
+  if (!p.img.complete || p.img.naturalWidth === 0) continue;
+
+  const t = (nowMs - p.born) / p.life; // 0~1
+  const a = 1 - t;
+
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.drawImage(p.img, p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+  ctx.restore();
+}
 
       // 판정 팝업(맨 위)
       const nowMs = performance.now();
@@ -1040,5 +1076,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
   </script>
 </body>
 </html>
+
 
 
