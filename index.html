@@ -177,7 +177,7 @@
 
     // ===== 박자(beat) 기반 배치 =====
     const BPM = 140;
-    const MS_PER_BEAT = 60000 / BPM;
+    const MS_PER_BEAT = 60000 / BPM; // 1 beat = 428.571...ms
     function beatToMs(beat) { return beat * MS_PER_BEAT; }
     function formatBeat(b) {
       if (Number.isInteger(b)) return String(b);
@@ -193,14 +193,25 @@
 
     const TOUCH_HIT_RADIUS = 40;
 
+    // 프레임 독립(시간 기반) 성장
     let lastFrameAt = 0;
     const GROW_PER_SEC = 26;
+
+    // ===== 퍼펙트 링만 0.5초 먼저 보여주기 =====
+    const PRE_RING_MS = 500;
+    let prePerfectRings = []; // {x, y, until}
+    function addPrePerfectRing(x, y) {
+      prePerfectRings.push({ x, y, until: performance.now() + PRE_RING_MS });
+    }
+    function removePrePerfectRingAt(x, y) {
+      prePerfectRings = prePerfectRings.filter(r => !(r.x === x && r.y === y));
+    }
 
     // ===== BGM =====
     let bgm;
     const BGM_SRC = "assets/bgm_retro.mp3";
 
-    // ===== COUNTDOWN TICK SFX (kick.mp3) =====
+    // ===== COUNTDOWN TICK SFX (틱 1개짜리) =====
     // assets/kick.mp3 로 넣어줘
     let sfxTick;
     const SFX_TICK_SRC = "assets/kick.mp3";
@@ -244,10 +255,11 @@
 
     function playTick() {
       try {
-        if (!sfxTick) sfxTick = new Audio(SFX_TICK_SRC);
-        try { sfxTick.pause(); sfxTick.currentTime = 0; } catch(e) {}
-        sfxTick.volume = 1.0;
-        sfxTick.play().catch(()=>{});
+        // 빠르게 연타될 수 있어서 clone으로 안정 재생
+        const a = new Audio(SFX_TICK_SRC);
+        a.volume = 1.0;
+        a.currentTime = 0;
+        a.play().catch(()=>{});
       } catch(e) {}
     }
 
@@ -282,16 +294,44 @@
       startAt:0,
       started:false,
       startShownUntil:0,
-      tickStage:0 // 0=아직, 1=3재생됨, 2=2재생됨, 3=1재생됨
+      tickStage:0 // 0=아직, 1=3 재생됨, 2=2 재생됨, 3=1 재생됨
     };
-
-    const COUNTDOWN_IDLE_MS = 1000;  // 처음 1초 공백
-    const COUNTDOWN_STEP_MS = 1000;  // 3,2,1 간격
+    const COUNTDOWN_IDLE_MS = 1000;
+    const COUNTDOWN_STEP_MS = 1000;
     const START_FLASH_MS = 650;
+
+    // ===== 리스너 관리(중복 방지) =====
+    let resizeBound = false;
+    function attachResizeOnce() {
+      if (resizeBound) return;
+      resizeBound = true;
+      window.addEventListener("resize", resizeCanvas);
+      window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
+    }
+
+    function detachCanvasListeners() {
+      if (!gameArea) return;
+      gameArea.removeEventListener("pointerdown", onPointerDown);
+      gameArea.removeEventListener("pointermove", onPointerMove);
+    }
+    function attachCanvasListeners() {
+      if (!gameArea) return;
+      gameArea.addEventListener("pointerdown", onPointerDown, { passive: true });
+      gameArea.addEventListener("pointermove", onPointerMove, { passive: true });
+    }
+
+    // 키보드는 문서 1회만(중복 방지)
+    let keyBound = false;
+    function attachKeyOnce() {
+      if (keyBound) return;
+      keyBound = true;
+      document.addEventListener("keydown", onKeyDown, { passive: true });
+    }
 
     function startCountdown() {
       stopAllTimers();
       circles = [];
+      prePerfectRings = [];
       score = 0;
       const scoreEl = document.getElementById("score");
       if (scoreEl) scoreEl.innerText = "0";
@@ -459,6 +499,33 @@
       bgX3 = drawScrollingLayer(bgNear, bgX3, bgSpeed3, dtSec);
       bgX4 = drawScrollingLayer(bgBlack,bgX4, bgSpeed4, dtSec);
 
+      // ===== 게임모드: 퍼펙트 링만 0.5초 먼저 표시 =====
+      if (!devMode) {
+        prePerfectRings = prePerfectRings.filter(r => r.until > now);
+
+        if (prePerfectRings.length) {
+          ctx.save();
+          ctx.globalAlpha = 0.35;
+
+          if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
+            const sizeP = TARGET * 2;
+            for (const r of prePerfectRings) {
+              ctx.drawImage(imgPerfect, r.x - TARGET, r.y - TARGET, sizeP, sizeP);
+            }
+          } else {
+            ctx.strokeStyle = "white";
+            ctx.setLineDash([10 / view.scale, 8 / view.scale]);
+            for (const r of prePerfectRings) {
+              ctx.beginPath();
+              ctx.arc(r.x, r.y, TARGET, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+          }
+
+          ctx.restore();
+        }
+      }
+
       // ===== 배치모드: 배치된 중심 점 + 퍼펙트 링 반투명 =====
       if (devMode) {
         ctx.save();
@@ -493,12 +560,10 @@
       if (!devMode && countdown.active) {
         const t = now - countdown.startAt;
 
-        // 3 구간부터 tickStage 1/2/3을 맞춰가며 재생
+        // 3~1 구간에서 1초마다 정확히 1번씩 틱
         if (t >= COUNTDOWN_IDLE_MS && t < COUNTDOWN_IDLE_MS + 3 * COUNTDOWN_STEP_MS) {
-          const phase = t - COUNTDOWN_IDLE_MS; // 0~2999...
+          const phase = t - COUNTDOWN_IDLE_MS;              // 0~2999...
           const stage = Math.floor(phase / COUNTDOWN_STEP_MS); // 0(3),1(2),2(1)
-
-          // stage=0이면 tickStage가 0->1이 되면서 1번 재생(=3과 동시)
           while (countdown.tickStage <= stage && countdown.tickStage < 3) {
             playTick();
             countdown.tickStage++;
@@ -571,6 +636,7 @@
       circles.forEach(c => {
         c.radius += grow;
 
+        // 노트 이미지
         if (imgNote.complete && imgNote.naturalWidth > 0) {
           const size = c.radius * 2;
           ctx.drawImage(imgNote, c.x - c.radius, c.y - c.radius, size, size);
@@ -581,6 +647,7 @@
           ctx.stroke();
         }
 
+        // 퍼펙트 기준 링(기존)
         if (imgPerfect.complete && imgPerfect.naturalWidth > 0) {
           const sizeP = TARGET * 2;
           ctx.drawImage(imgPerfect, c.x - TARGET, c.y - TARGET, sizeP, sizeP);
@@ -615,6 +682,10 @@
       isPlaying = false;
       countdown.active = false;
 
+      stopAllTimers();
+      circles = [];
+      prePerfectRings = [];
+
       document.getElementById("content").innerHTML = `
         <div class="input-row">
           <label for="studentId">학번</label>
@@ -636,6 +707,9 @@
       const id = (document.getElementById("studentId").value || "").trim();
       const name = (document.getElementById("name").value || "").trim();
 
+      // 이전 캔버스 리스너 정리
+      detachCanvasListeners();
+
       document.getElementById("content").innerHTML = `
         <canvas id="gameCanvas"></canvas>
         <p>점수: <span id="score">0</span></p>
@@ -646,15 +720,11 @@
       ctx = gameArea.getContext("2d");
 
       resizeCanvas();
+      attachCanvasListeners();
+      attachResizeOnce();
+      attachKeyOnce();
 
-      document.addEventListener("keydown", onKeyDown, { passive: true });
-      gameArea.addEventListener("pointerdown", onPointerDown, { passive: true });
-      gameArea.addEventListener("pointermove", onPointerMove, { passive: true });
-
-      window.addEventListener("resize", resizeCanvas);
-      window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
-
-      // ✅ 카운트다운 시작(3/2/1에 맞춰 tick / START 순간 BGM 시작)
+      // ✅ 카운트다운 시작(3/2/1 틱 / START 순간 BGM)
       primeBgm();
       primeTick();
       startCountdown();
@@ -668,11 +738,20 @@
       devMode = false;
       isPlaying = false;
       countdown.active = false;
+
+      stopAllTimers();
+      circles = [];
+      prePerfectRings = [];
+
+      if (bgm) { try { bgm.pause(); } catch(e) {} }
+
       document.getElementById("content").innerHTML = `<p>랭킹 기능은 추후 추가 예정</p>`;
     }
 
     // ====== 데이터 / API ======
     function createCircle(x = CENTER_X(), y = CENTER_Y()) {
+      // 같은 좌표에 “미리 링”이 있으면 중복 방지로 제거
+      removePrePerfectRingAt(x, y);
       circles.push({ x, y, radius: NOTE_START_R });
     }
     window.createCircle = createCircle;
@@ -686,9 +765,12 @@
 
       stopAllTimers();
       circles = [];
+      prePerfectRings = [];
 
       if (bgm) { try { bgm.pause(); bgm.currentTime = 0; } catch(e) {} }
-      if (sfxTick) { try { sfxTick.pause(); sfxTick.currentTime = 0; } catch(e) {} }
+
+      // 이전 캔버스 리스너 정리
+      detachCanvasListeners();
 
       document.getElementById("content").innerHTML = `
         <div class="dev-wrap">
@@ -714,17 +796,17 @@
 
       gameArea = document.getElementById("gameCanvas");
       ctx = gameArea.getContext("2d");
+
       resizeCanvas();
+      attachCanvasListeners();
+      attachResizeOnce();
+      attachKeyOnce();
 
       mouse.x = CENTER_X();
       mouse.y = CENTER_Y();
       showGhost = false;
 
       renderPlacementList();
-
-      document.addEventListener("keydown", onKeyDown, { passive: true });
-      gameArea.addEventListener("pointerdown", onPointerDown, { passive: true });
-      gameArea.addEventListener("pointermove", onPointerMove, { passive: true });
 
       lastFrameAt = 0;
       requestAnimationFrame(updateGame);
@@ -779,6 +861,13 @@
       placements.forEach(p => {
         const perfectMs = beatToMs(p.t);
         const spawnDelay = Math.max(0, perfectMs - leadMs);
+
+        // ✅ 퍼펙트 링만 0.5초 먼저
+        const ringDelay = Math.max(0, spawnDelay - PRE_RING_MS);
+        const idRing = setTimeout(() => addPrePerfectRing(p.x, p.y), ringDelay);
+        activeTimers.push(idRing);
+
+        // 노트(원)
         const id = setTimeout(() => createCircle(p.x, p.y), spawnDelay);
         activeTimers.push(id);
       });
