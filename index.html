@@ -304,7 +304,9 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     let circles = [];
 
     // ✅ 모바일이 “화면이 더 빠르게” 느껴지면 여기만 올려서 보정(60~120 추천)
-    const SYNC_VISUAL_DELAY_MS = 90;
+    const IS_MOBILE = matchMedia("(pointer:coarse)").matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const SYNC_VISUAL_DELAY_MS = IS_MOBILE ? 90 : 0;
+
 
     // ===== 스크롤 잠금/해제 =====
     let savedScrollY = 0;
@@ -879,4 +881,5 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
   </script>
 </body>
 </html>
+
 
