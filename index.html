@@ -175,9 +175,11 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
     import {
-      getFirestore, collection, addDoc, serverTimestamp,
-      getDocs, query, orderBy, limit
-    } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+    getFirestore, collection, serverTimestamp,
+    getDocs, query, orderBy, limit,
+    doc, runTransaction
+  } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+
 
     // ==============================
     // Firebase
@@ -195,12 +197,47 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    async function submitScore({ studentId, name, score, playTimeMs }) {
-      await addDoc(collection(db, "scores"), {
-        studentId, name, score, playTimeMs,
-        createdAt: serverTimestamp()
+    function makeScoreDocId(studentId, name) {
+  // Firestore 문서ID는 "/" 같은 문자가 있으면 안 돼서 안전하게 인코딩
+  return `${encodeURIComponent(studentId)}__${encodeURIComponent(name)}`;
+}
+
+async function submitScore({ studentId, name, score, playTimeMs }) {
+  studentId = (studentId || "").trim();
+  name = (name || "").trim();
+
+  const id = makeScoreDocId(studentId, name);
+  const ref = doc(db, "scores", id);
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+
+    if (!snap.exists()) {
+      // 최초 기록
+      tx.set(ref, {
+        studentId, name,
+        score,
+        playTimeMs,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+
+    const prev = snap.data() || {};
+    const prevScore = Number(prev.score || 0);
+
+    // ✅ 더 높은 점수일 때만 덮어쓰기
+    if (score > prevScore) {
+      tx.update(ref, {
+        score,
+        playTimeMs,
+        updatedAt: serverTimestamp(),
       });
     }
+  });
+}
+
 
     async function fetchTopScores(max = 20) {
       const q = query(
@@ -1307,3 +1344,4 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
   </script>
 </body>
 </html>
+
