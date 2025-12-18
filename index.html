@@ -105,12 +105,8 @@
   <!-- 🔥 Firebase / Firestore (점수 저장용 - 나중에 사용) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-    import {
-      getFirestore,
-      collection,
-      addDoc,
-      serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, serverTimestamp }
+      from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBxOnlL3ugTshph4CpWFSkE9BE-qgRgPlQ",
@@ -131,7 +127,6 @@
         createdAt: serverTimestamp()
       });
     }
-
     window.submitScore = submitScore;
   </script>
 
@@ -155,14 +150,9 @@
       window.scrollTo(0, y);
     }
 
-    // 플레이타임
-    let gameStartAt = 0;
-    function getPlayTimeMs() { return performance.now() - gameStartAt; }
-
     // 개발자 배치 모드
     let devMode = false;
     let placements = [];  // {x, y, t} (t는 beat)
-    let activeTimers = [];
     let showGhost = false;
 
     // 논리 좌표(디자인 해상도) — 9:16
@@ -198,12 +188,56 @@
 
     // ===== 퍼펙트 링 0.5초 미리 =====
     const PRE_RING_MS = 500;
-    let prePerfectRings = []; // {x, y, until}
-    function addPrePerfectRing(x, y) {
-      prePerfectRings.push({ x, y, until: performance.now() + PRE_RING_MS });
+    let prePerfectRings = []; // {x, y, untilSongMs}
+    function addPrePerfectRing(x, y, nowSongMs) {
+      prePerfectRings.push({ x, y, untilSongMs: nowSongMs + PRE_RING_MS });
     }
     function removePrePerfectRingAt(x, y) {
       prePerfectRings = prePerfectRings.filter(r => !(r.x === x && r.y === y));
+    }
+
+    // ====== 오디오 기준 싱크 스폰 런타임 ======
+    // PC/모바일 싱크 차이를 없애려면 타이머가 아니라 "bgm.currentTime"로 스폰해야 함.
+    let spawnList = [];      // {x,y, ringMs, spawnMs}
+    let nextRingIdx = 0;
+    let nextSpawnIdx = 0;
+
+    function prepareSpawnList() {
+      // placements를 사용해서, 음악 기준 ms로 환산된 스폰 타임들을 만든다.
+      const leadMs = ((TARGET - NOTE_START_R) / GROW_PER_SEC) * 1000;
+
+      sortPlacements();
+
+      spawnList = placements.map(p => {
+        const perfectMs = beatToMs(p.t); // 퍼펙트 중심 시각
+        const spawnMs = Math.max(0, perfectMs - leadMs);        // 노트 등장 시각
+        const ringMs  = Math.max(0, spawnMs - PRE_RING_MS);     // 링 0.5초 미리
+        return { x: p.x, y: p.y, ringMs, spawnMs };
+      });
+
+      nextRingIdx = 0;
+      nextSpawnIdx = 0;
+    }
+
+    function getSongMs() {
+      if (!bgm) return 0;
+      const t = Number(bgm.currentTime || 0);
+      return Math.max(0, t * 1000);
+    }
+
+    function updateSpawnsBySong(songMs) {
+      // 링 미리 생성
+      while (nextRingIdx < spawnList.length && songMs >= spawnList[nextRingIdx].ringMs) {
+        const it = spawnList[nextRingIdx];
+        addPrePerfectRing(it.x, it.y, songMs);
+        nextRingIdx++;
+      }
+      // 노트 생성
+      while (nextSpawnIdx < spawnList.length && songMs >= spawnList[nextSpawnIdx].spawnMs) {
+        const it = spawnList[nextSpawnIdx];
+        createCircle(it.x, it.y);
+        nextSpawnIdx++;
+      }
     }
 
     // ===== BGM =====
@@ -211,23 +245,7 @@
     const BGM_SRC = "assets/bgm_retro.mp3";
 
     // ===== COUNTDOWN TICK SFX (틱 1개짜리) =====
-    // assets/kick.mp3 로 넣어줘
     const SFX_TICK_SRC = "assets/kick.mp3";
-
-    function primeBgm() {
-      try {
-        if (!bgm) bgm = new Audio(BGM_SRC);
-        bgm.loop = true;
-        bgm.volume = 0.5;
-        bgm.currentTime = 0;
-
-        const p = bgm.play();
-        if (p && typeof p.then === "function") {
-          p.then(() => { bgm.pause(); bgm.currentTime = 0; }).catch(()=>{});
-        }
-      } catch(e) {}
-    }
-
     function primeTick() {
       try {
         const a = new Audio(SFX_TICK_SRC);
@@ -239,13 +257,27 @@
         }
       } catch(e) {}
     }
-
     function playTick() {
       try {
         const a = new Audio(SFX_TICK_SRC);
         a.volume = 1.0;
         a.currentTime = 0;
         a.play().catch(()=>{});
+      } catch(e) {}
+    }
+
+    function primeBgm() {
+      try {
+        if (!bgm) bgm = new Audio(BGM_SRC);
+        bgm.loop = false;           // ✅ 1분짜리라면 루프 끄는게 싱크/운영에 안정적
+        bgm.volume = 0.5;
+        bgm.currentTime = 0;
+
+        // 권한/로드 프라임
+        const p = bgm.play();
+        if (p && typeof p.then === "function") {
+          p.then(() => { bgm.pause(); bgm.currentTime = 0; }).catch(()=>{});
+        }
       } catch(e) {}
     }
 
@@ -258,7 +290,7 @@
     imgPerfect.crossOrigin = "anonymous";
     imgPerfect.src = "assets/perfect.png";
 
-    // ✅ 퍼펙트 링 렌더러(미리 링/노트 링 동일한 색으로 통일)
+    // ✅ 퍼펙트 링 렌더러(미리 링/노트 링 동일)
     function drawPerfectRingAt(x, y, alpha = 1.0) {
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -267,7 +299,6 @@
         const sizeP = TARGET * 2;
         ctx.drawImage(imgPerfect, x - TARGET, y - TARGET, sizeP, sizeP);
       } else {
-        // 이미지 로딩 전에도 "같은 색" 느낌으로: 빨강 점선
         ctx.strokeStyle = "red";
         ctx.setLineDash([10 / view.scale, 7 / view.scale]);
         ctx.beginPath();
@@ -334,7 +365,6 @@
     }
 
     function startCountdown() {
-      stopAllTimers();
       circles = [];
       prePerfectRings = [];
       score = 0;
@@ -348,6 +378,11 @@
       countdown.started = false;
       countdown.startShownUntil = 0;
       countdown.tickStage = 0;
+
+      // 스폰 런타임 초기화(START 순간 오디오 기준으로 돌릴 예정)
+      prepareSpawnList();
+      nextRingIdx = 0;
+      nextSpawnIdx = 0;
 
       if (bgm) { try { bgm.pause(); bgm.currentTime = 0; } catch(e) {} }
     }
@@ -503,12 +538,22 @@
       bgX3 = drawScrollingLayer(bgNear, bgX3, bgSpeed3, dtSec);
       bgX4 = drawScrollingLayer(bgBlack,bgX4, bgSpeed4, dtSec);
 
-      // ===== 게임모드: 미리 퍼펙트 링(색 동일) =====
+      // ===== 게임모드: 오디오 기준으로 스폰 =====
+      if (!devMode && isPlaying) {
+        const songMs = getSongMs();
+
+        // 미리 링 만료(오디오 기준)
+        prePerfectRings = prePerfectRings.filter(r => r.untilSongMs > songMs);
+
+        // 오디오 진행 시간 기준으로 링/노트 생성
+        updateSpawnsBySong(songMs);
+      }
+
+      // ===== 게임모드: 미리 퍼펙트 링 =====
       if (!devMode) {
-        prePerfectRings = prePerfectRings.filter(r => r.until > now);
-        for (const r of prePerfectRings) {
-          drawPerfectRingAt(r.x, r.y, 1.0); // ✅ 원래 링과 동일한 색/강도로
-        }
+        const songMs = getSongMs();
+        prePerfectRings = prePerfectRings.filter(r => r.untilSongMs > songMs);
+        for (const r of prePerfectRings) drawPerfectRingAt(r.x, r.y, 1.0);
       }
 
       // ===== 배치모드: 점 + 링(반투명) =====
@@ -550,13 +595,12 @@
             countdown.started = true;
             countdown.startShownUntil = now + START_FLASH_MS;
 
-            // START 순간: 게임 시작
+            // ✅ START 순간: 오디오부터 재생(싱크 기준)
             isPlaying = true;
-            gameStartAt = performance.now();
-            lastFrameAt = now;
-
-            stopAllTimers();
-            schedulePlacements();
+            circles = [];
+            prePerfectRings = [];
+            nextRingIdx = 0;
+            nextSpawnIdx = 0;
 
             try {
               if (bgm) {
@@ -583,16 +627,15 @@
         }
       }
 
-      // ===== 플레이타임 =====
+      // ===== 플레이타임(오디오 기준 표시) =====
       if (!devMode && isPlaying) {
+        const songMs = getSongMs();
         ctx.save();
-        ctx.setLineDash([]);
         ctx.fillStyle = "white";
         ctx.textAlign = "right";
         ctx.textBaseline = "top";
         ctx.font = `${Math.max(12, Math.floor(14 / view.scale))}px sans-serif`;
-        const tSec = (getPlayTimeMs() / 1000).toFixed(2);
-        ctx.fillText(`t=${tSec}s`, DESIGN_W - 8, 8);
+        ctx.fillText(`t=${(songMs/1000).toFixed(2)}s`, DESIGN_W - 8, 8);
         ctx.restore();
       }
 
@@ -602,7 +645,7 @@
       circles.forEach(c => {
         c.radius += grow;
 
-        // 노트만 그림(✅ 원래 퍼펙트 링은 여기서 더 이상 그리지 않음)
+        // 노트
         if (imgNote.complete && imgNote.naturalWidth > 0) {
           const size = c.radius * 2;
           ctx.drawImage(imgNote, c.x - c.radius, c.y - c.radius, size, size);
@@ -614,10 +657,8 @@
         }
       });
 
-      // ✅ 노트 위에 퍼펙트 링(색 통일) — "원래 퍼펙트 링" 경로를 이걸로 대체
-      for (const c of circles) {
-        drawPerfectRingAt(c.x, c.y, 1.0);
-      }
+      // 퍼펙트 링(노트 위)
+      for (const c of circles) drawPerfectRingAt(c.x, c.y, 1.0);
 
       circles = circles.filter(c => c.radius <= 85);
 
@@ -639,9 +680,10 @@
       isPlaying = false;
       countdown.active = false;
 
-      stopAllTimers();
       circles = [];
       prePerfectRings = [];
+
+      if (bgm) { try { bgm.pause(); } catch(e) {} }
 
       document.getElementById("content").innerHTML = `
         <div class="input-row">
@@ -694,7 +736,6 @@
       isPlaying = false;
       countdown.active = false;
 
-      stopAllTimers();
       circles = [];
       prePerfectRings = [];
 
@@ -705,7 +746,6 @@
 
     // ====== 데이터 / API ======
     function createCircle(x = CENTER_X(), y = CENTER_Y()) {
-      // ✅ 미리 링이 남아있으면 즉시 제거(겹쳐서 더 빨갛게 보이는 현상 방지)
       removePrePerfectRingAt(x, y);
       circles.push({ x, y, radius: NOTE_START_R });
     }
@@ -718,7 +758,6 @@
       isPlaying = false;
       countdown.active = false;
 
-      stopAllTimers();
       circles = [];
       prePerfectRings = [];
 
@@ -795,36 +834,14 @@
       placements = parsePlacementText(ta.value);
       sortPlacements();
       renderPlacementList();
+      // ✅ 게임 스폰리스트도 갱신(다음 플레이부터 반영)
+      prepareSpawnList();
     }
 
     function clearPlacements() {
       placements = [];
       renderPlacementList();
-    }
-
-    // ====== 스케줄 ======
-    function stopAllTimers() {
-      activeTimers.forEach(id => clearTimeout(id));
-      activeTimers = [];
-    }
-
-    function schedulePlacements() {
-      // t는 "퍼펙트 중심(TARGET)이 되는 시점"의 박자(beat)
-      const leadMs = ((TARGET - NOTE_START_R) / GROW_PER_SEC) * 1000;
-
-      placements.forEach(p => {
-        const perfectMs = beatToMs(p.t);
-        const spawnDelay = Math.max(0, perfectMs - leadMs);
-
-        // ✅ 퍼펙트 링만 0.5초 먼저
-        const ringDelay = Math.max(0, spawnDelay - PRE_RING_MS);
-        const idRing = setTimeout(() => addPrePerfectRing(p.x, p.y), ringDelay);
-        activeTimers.push(idRing);
-
-        // 노트(원)
-        const id = setTimeout(() => createCircle(p.x, p.y), spawnDelay);
-        activeTimers.push(id);
-      });
+      prepareSpawnList();
     }
 
     // 첫 진입
