@@ -448,7 +448,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
 
     const IS_MOBILE = matchMedia("(pointer:coarse)").matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     // ✅ 링만 모바일에서 조금 더 크게 보이게(값만 조절하면 됨)
-    const PERFECT_RING_SCALE = IS_MOBILE ? 1.5 : 1.0;
+    const PERFECT_RING_SCALE = IS_MOBILE ? 1.0 : 1.0;
 
     const SYNC_VISUAL_DELAY_MS = IS_MOBILE ? 90 : 0;
 
@@ -1350,6 +1350,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
   </script>
 </body>
 </html>
+
 
 
 
