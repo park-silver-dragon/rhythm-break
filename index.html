@@ -18,28 +18,28 @@
     body { display: flex; flex-direction: column; align-items: center; padding: 16px; }
 
     /* ✅ 로고 타이틀 */
-   h1.title-logo{
-  margin: 0 0 6px;
-  padding: 0;
-  text-align: center;
-  line-height: 0;  /* ✅ h1 기본 라인 높이 제거 */
-  font-size: 0;    /* ✅ h1 기본 글자 높이 제거(이게 핵심) */
-}
+    h1.title-logo{
+      margin: 0 0 6px;
+      padding: 0;
+      text-align: center;
+      line-height: 0;  /* ✅ h1 기본 라인 높이 제거 */
+      font-size: 0;    /* ✅ h1 기본 글자 높이 제거 */
+    }
 
     .logo-box{
-  width: min(260px, 46vw);
-  aspect-ratio: 1920 / 696;
-  margin: 0 auto;
-  overflow: visible; /* 또는 지워도 됨 */
-}
+      width: min(260px, 46vw);
+      aspect-ratio: 1920 / 696;
+      margin: 0 auto;
+      overflow: visible;
+    }
 
-.logo-box img{
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: contain;     /* ✅ 좌우 안 잘림 */
-  object-position: center;
-}
+    .logo-box img{
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;     /* ✅ 좌우 안 잘림 */
+      object-position: center;
+    }
 
     .bar {
       width: 100%; max-width: var(--max-width);
@@ -423,39 +423,31 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     const PERFECT_MIN = TARGET - PERFECT_WINDOW;
     const PERFECT_MAX = TARGET + PERFECT_WINDOW;
     const TOUCH_HIT_RADIUS = 40;
-    const GOOD_WINDOW = 16; // 기존 체감(±25) → 조금 좁힘(±16)
+    const GOOD_WINDOW = 16;
     const GROW_PER_SEC = 26;
 
     function judge(r) {
       if (r > PERFECT_MIN && r < PERFECT_MAX) return { type: "perfect", pts: 100 };
       if (Math.abs(r - TARGET) <= GOOD_WINDOW) return { type: "good", pts: 50 };
-      return { type: "miss", pts: 10 }; // 원하면 0으로 바꿔도 됨
+      return { type: "miss", pts: 10 };
     }
 
     // 판정 팝업(이미지)
     const imgJudgePerfect = new Image(); imgJudgePerfect.src = "assets/judge_perfect.png";
     const imgJudgeGood    = new Image(); imgJudgeGood.src    = "assets/good.png";
     const imgJudgeMiss    = new Image(); imgJudgeMiss.src    = "assets/miss.png";
+
     // ✅ 터치 이펙트(별)
-const imgStar = new Image(); imgStar.src = "assets/star.png";
-
-let starPopups = []; // {x,y,img,born,life,size}
-const STAR_LIFE_MS = 380;
-
-function addStarPopup(x, y, size = TARGET * 2) {
-  starPopups.push({
-    x, y,
-    img: imgStar,
-    born: performance.now(),
-    life: STAR_LIFE_MS,
-    size
-  });
-}
-
+    const imgStar = new Image(); imgStar.src = "assets/star.png";
+    let starPopups = []; // {x,y,img,born,life,size}
+    const STAR_LIFE_MS = 380;
+    function addStarPopup(x, y, size = TARGET * 2) {
+      starPopups.push({ x, y, img: imgStar, born: performance.now(), life: STAR_LIFE_MS, size });
+    }
 
     let judgePopups = []; // {x,y,img,born,life,size}
     const POPUP_LIFE_MS = 450;
-    const JUDGE_POP_SIZE = TARGET * 2; // "원 정도" 크기
+    const JUDGE_POP_SIZE = TARGET * 2;
     function addJudgePopup(type, x, y) {
       const img =
         type === "perfect" ? imgJudgePerfect :
@@ -477,7 +469,6 @@ function addStarPopup(x, y, size = TARGET * 2) {
     const BGM_SRC = "assets/bgm_retro.mp3";
     const SFX_TICK_SRC = "assets/kick.mp3";
 
-    // tick 풀(동시 재생 대비)
     let tickPool = [];
     let tickPoolIdx = 0;
 
@@ -494,7 +485,7 @@ function addStarPopup(x, y, size = TARGET * 2) {
     function primeBgm() {
       try {
         if (!bgm) bgm = new Audio(BGM_SRC);
-        bgm.loop = false;     // 1분곡이면 보통 false가 싱크 안정적
+        bgm.loop = false;
         bgm.volume = 0.5;
         bgm.currentTime = 0;
 
@@ -541,8 +532,6 @@ function addStarPopup(x, y, size = TARGET * 2) {
     // 배경 / 이미지
     // ==============================
     const imgNote = new Image(); imgNote.src = "assets/note.png";
-
-    // ✅ 퍼펙트 링(기준선) 이미지는 이걸로!
     const imgRing = new Image(); imgRing.src = "assets/perfect_ring.png";
 
     const bgSky   = new Image(); bgSky.src   = "assets/bg_city_sky.png";
@@ -567,7 +556,6 @@ function addStarPopup(x, y, size = TARGET * 2) {
       let cssW = containerW;
       let cssH = Math.round(cssW * aspect);
 
-      // ✅ 남는 화면 높이 기준(모바일 하단 짤림 방지)
       const vh = window.innerHeight || document.documentElement.clientHeight || 0;
       const canvasTop = gameArea.getBoundingClientRect().top;
       const safeBottom = 8;
@@ -631,7 +619,7 @@ function addStarPopup(x, y, size = TARGET * 2) {
     // ==============================
     // 스폰(오디오 시간 기준) + 링 0.5초 먼저
     // ==============================
-    let placements = []; // {x,y,t(beat), idx}
+    let placements = [];
     function parsePlacementsFromCode(code) {
       const out = [];
       const re = /createCircle\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*,\s*beatToMs\(\s*([0-9]+(?:\.[0-9]+)?)\s*\)/g;
@@ -644,9 +632,9 @@ function addStarPopup(x, y, size = TARGET * 2) {
     }
 
     const PRE_RING_MS = 500;
-    const rings = new Map(); // key -> {x,y}
+    const rings = new Map();
 
-    let spawnList = [];   // {x,y, ringMs, spawnMs, key}
+    let spawnList = [];
     let nextRingIdx = 0;
     let nextSpawnIdx = 0;
 
@@ -683,14 +671,12 @@ function addStarPopup(x, y, size = TARGET * 2) {
     function updateSpawnsBySong(songMsRaw) {
       const songMs = Math.max(0, songMsRaw - SYNC_VISUAL_DELAY_MS);
 
-      // 링 먼저
       while (nextRingIdx < spawnList.length && songMs >= spawnList[nextRingIdx].ringMs) {
         const it = spawnList[nextRingIdx];
         rings.set(it.key, { x: it.x, y: it.y });
         nextRingIdx++;
       }
 
-      // 노트 생성
       while (nextSpawnIdx < spawnList.length && songMs >= spawnList[nextSpawnIdx].spawnMs) {
         const it = spawnList[nextSpawnIdx];
         createCircle(it.x, it.y, it.key);
@@ -710,20 +696,19 @@ function addStarPopup(x, y, size = TARGET * 2) {
     }
 
     function applyJudgeAndRemove(index) {
-  const c = circles[index];
+      const c = circles[index];
 
-  // ✅ 터치한 순간 별 이펙트
-  addStarPopup(c.x, c.y, TARGET * 2);
+      // ✅ 터치한 순간 별 이펙트
+      addStarPopup(c.x, c.y, TARGET * 2);
 
-  const j = judge(c.radius);
+      const j = judge(c.radius);
 
-  score += j.pts;
-  setTopScore(score);
+      score += j.pts;
+      setTopScore(score);
 
-  addJudgePopup(j.type, c.x, c.y);
-  removeCircleAt(index);
-}
-
+      addJudgePopup(j.type, c.x, c.y);
+      removeCircleAt(index);
+    }
 
     function attemptHitAt(x, y) {
       if (!isPlaying) return;
@@ -776,7 +761,6 @@ function addStarPopup(x, y, size = TARGET * 2) {
       attemptHitAt(x, y);
     }
 
-    // 리스너 중복 방지
     let keyBound = false;
     let resizeBound = false;
     function bindKeyOnce() {
@@ -801,8 +785,8 @@ function addStarPopup(x, y, size = TARGET * 2) {
       startShownUntil:0,
       tickStage:0
     };
-    const COUNTDOWN_IDLE_MS = 1000; // 1초 공백
-    const COUNTDOWN_STEP_MS = 1000; // 3,2,1
+    const COUNTDOWN_IDLE_MS = 1000;
+    const COUNTDOWN_STEP_MS = 1000;
     const START_FLASH_MS = 650;
 
     let lastFrameAt = 0;
@@ -812,6 +796,9 @@ function addStarPopup(x, y, size = TARGET * 2) {
     function startCountdown() {
       circles = [];
       rings.clear();
+      judgePopups = [];
+      starPopups = [];
+
       score = 0;
       setTopScore(0);
 
@@ -862,7 +849,7 @@ function addStarPopup(x, y, size = TARGET * 2) {
 
         if (t >= COUNTDOWN_IDLE_MS && t < COUNTDOWN_IDLE_MS + 3 * COUNTDOWN_STEP_MS) {
           const phase = t - COUNTDOWN_IDLE_MS;
-          const stage = Math.floor(phase / COUNTDOWN_STEP_MS); // 0(3),1(2),2(1)
+          const stage = Math.floor(phase / COUNTDOWN_STEP_MS);
           while (countdown.tickStage <= stage && countdown.tickStage < 3) {
             playTick();
             countdown.tickStage++;
@@ -879,10 +866,11 @@ function addStarPopup(x, y, size = TARGET * 2) {
             countdown.started = true;
             countdown.startShownUntil = now + START_FLASH_MS;
 
-            // START 순간: 오디오 시작(이 시간 기준으로 스폰)
             isPlaying = true;
             circles = [];
             rings.clear();
+            judgePopups = [];
+            starPopups = [];
             nextRingIdx = 0;
             nextSpawnIdx = 0;
 
@@ -916,7 +904,7 @@ function addStarPopup(x, y, size = TARGET * 2) {
         updateSpawnsBySong(getSongMsRaw());
       }
 
-      // 퍼펙트 링(노트보다 0.5초 먼저)
+      // 퍼펙트 링
       for (const r of rings.values()) {
         drawPerfectRingAt(r.x, r.y);
       }
@@ -944,29 +932,29 @@ function addStarPopup(x, y, size = TARGET * 2) {
           removeCircleAt(i);
         }
       }
+
+      // ✅ 여기서 nowMs를 "한 번만" 선언해서 별/판정 둘 다 씀 (버그 해결 핵심)
+      const nowMs = performance.now();
+
       // ✅ 별 팝업
-const nowMs = performance.now();
-starPopups = starPopups.filter(p => nowMs - p.born < p.life);
+      starPopups = starPopups.filter(p => nowMs - p.born < p.life);
+      for (const p of starPopups) {
+        if (!p.img.complete || p.img.naturalWidth === 0) continue;
 
-for (const p of starPopups) {
-  if (!p.img.complete || p.img.naturalWidth === 0) continue;
+        const t = (nowMs - p.born) / p.life;
+        const a = 1 - t;
 
-  const t = (nowMs - p.born) / p.life; // 0~1
-  const a = 1 - t;
-
-  ctx.save();
-  ctx.globalAlpha = a;
-  ctx.drawImage(p.img, p.x - p.size/2, p.y - p.size/2, p.size, p.size);
-  ctx.restore();
-}
+        ctx.save();
+        ctx.globalAlpha = a;
+        ctx.drawImage(p.img, p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+        ctx.restore();
+      }
 
       // 판정 팝업(맨 위)
-      const nowMs = performance.now();
       judgePopups = judgePopups.filter(p => nowMs - p.born < p.life);
-
       for (const p of judgePopups) {
-        const t = (nowMs - p.born) / p.life;   // 0~1
-        const a = 1 - t;                       // 페이드아웃
+        const t = (nowMs - p.born) / p.life;
+        const a = 1 - t;
 
         if (!p.img.complete || p.img.naturalWidth === 0) continue;
 
@@ -991,6 +979,7 @@ for (const p of starPopups) {
       circles = [];
       rings.clear();
       judgePopups = [];
+      starPopups = [];
       score = 0;
       setTopScore(0);
 
@@ -1016,12 +1005,10 @@ for (const p of starPopups) {
       lockScroll();
       setTopBarMode("score");
 
-      // (로그용) 지금은 저장 안하지만 값은 받아둠
       const id = (document.getElementById("studentId").value || "").trim();
       const name = (document.getElementById("name").value || "").trim();
       window._player = { id, name };
 
-      // ✅ 공간 아끼려고 게임 중엔 캔버스만
       document.getElementById("content").innerHTML = `
         <canvas id="gameCanvas"></canvas>
       `;
@@ -1036,12 +1023,10 @@ for (const p of starPopups) {
       placements = parsePlacementsFromCode(PLACEMENT_CODE);
       prepareSpawnList();
 
-      // 오디오 프라임 + 카운트다운
       primeBgm();
       primeTick();
       startCountdown();
 
-      // UI 바뀐 뒤 정확한 남는 높이로 리사이즈
       resizeCanvas();
       setTimeout(resizeCanvas, 0);
 
@@ -1058,6 +1043,7 @@ for (const p of starPopups) {
       circles = [];
       rings.clear();
       judgePopups = [];
+      starPopups = [];
 
       if (bgm) { try { bgm.pause(); } catch(e) {} }
 
@@ -1065,7 +1051,6 @@ for (const p of starPopups) {
     }
     window.showRanking = showRanking;
 
-    // 노트 생성
     function createCircle(x, y, ringKey) {
       circles.push({ x, y, radius: NOTE_START_R, ringKey });
     }
@@ -1076,6 +1061,3 @@ for (const p of starPopups) {
   </script>
 </body>
 </html>
-
-
-
