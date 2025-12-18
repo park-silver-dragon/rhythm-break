@@ -17,7 +17,7 @@
     }
     body { display: flex; flex-direction: column; align-items: center; padding: 16px; }
 
-    /* ✅ 로고 타이틀 */
+    /* ✅ 로고 */
     h1.title-logo{
       margin: 0 0 6px;
       padding: 0;
@@ -42,6 +42,7 @@
     .bar {
       width: 100%; max-width: var(--max-width);
       display: flex; justify-content: center; gap: 12px;
+      align-items: center;
     }
     .bar.menu { flex-wrap: nowrap; }
     .bar.menu > button, .bar.menu > .score-box { flex: 1 1 0; min-width: 0; }
@@ -51,8 +52,10 @@
       padding: 14px 18px; min-height: 48px;
       border-radius: 12px; border: 1px solid #222; background:#0b0b0b;
       box-shadow: 0 1px 0 rgba(0,0,0,0.06); cursor: pointer; color:#fff;
+      white-space: nowrap;
     }
     button:active { transform: translateY(1px); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
 
     .score-box{
       display:none;
@@ -64,8 +67,15 @@
       font-weight: 900;
       color:#fff;
       user-select:none;
+      flex: 1 1 auto;
+      min-width: 0;
     }
     .score-box span{ margin-left:8px; }
+
+    #btnRetry{
+      display:none;
+      flex: 0 0 auto;
+    }
 
     #content { width: 100%; max-width: var(--max-width); margin-top: 12px; }
 
@@ -76,7 +86,9 @@
       padding: 12px 14px; min-height: 48px;
       width: min(420px, 80vw);
       border: 1.2px solid #222; border-radius: 10px; background: #0b0b0b; color:#fff;
+      outline: none;
     }
+    input[type="text"].invalid { border-color: #ff4d4d; }
 
     p { margin: 10px 0; font-size: clamp(15px, 4.2vw, 17px); text-align:center; color:#ddd; }
 
@@ -104,8 +116,42 @@
       border-radius: 10px;
     }
 
-    /* ✅ 게임 중 위 여백 줄여서 캔버스 더 위로 */
     body.playing #content { margin-top: 6px; }
+
+    /* ✅ 랭킹 */
+    .rank-wrap{
+      border: 1px solid #222;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #070707;
+    }
+    .rank-head{
+      display:flex;
+      justify-content: space-between;
+      align-items:center;
+      padding: 12px 14px;
+      border-bottom: 1px solid #222;
+      gap: 10px;
+    }
+    .rank-head strong{ font-size: 18px; }
+    .rank-actions{ display:flex; gap: 8px; }
+    .rank-table{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .rank-table th, .rank-table td{
+      padding: 10px 10px;
+      border-bottom: 1px solid #151515;
+      text-align: left;
+      color:#ddd;
+    }
+    .rank-table th{
+      color:#fff;
+      background: #0b0b0b;
+      font-weight: 800;
+    }
+    .muted{ color:#aaa; font-size: 13px; }
   </style>
 </head>
 
@@ -117,19 +163,25 @@
   </h1>
 
   <div class="bar menu" id="topBar">
-    <button id="btnStart" onclick="startGame()">게임 시작</button>
-    <button id="btnRank" onclick="showRanking()">랭킹 확인</button>
+    <button id="btnStart">게임 시작</button>
+    <button id="btnRank">랭킹 확인</button>
+
     <div class="score-box" id="scoreBox">점수 <span id="scoreTop">0</span></div>
+    <button id="btnRetry">다시하기</button>
   </div>
 
   <div id="content"></div>
 
-  <!-- 🔥 Firebase / Firestore -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp }
-      from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+    import {
+      getFirestore, collection, addDoc, serverTimestamp,
+      getDocs, query, orderBy, limit
+    } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
+    // ==============================
+    // Firebase
+    // ==============================
     const firebaseConfig = {
       apiKey: "AIzaSyBxOnlL3ugTshph4CpWFSkE9BE-qgRgPlQ",
       authDomain: "rhythm-break.firebaseapp.com",
@@ -149,10 +201,17 @@
         createdAt: serverTimestamp()
       });
     }
-    window.submitScore = submitScore;
-  </script>
 
-  <script>
+    async function fetchTopScores(max = 20) {
+      const q = query(
+        collection(db, "scores"),
+        orderBy("score", "desc"),
+        limit(max)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+
     // ==============================
     // ✅ 운영용 배치 데이터
     // ==============================
@@ -372,17 +431,20 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       const btnStart = document.getElementById("btnStart");
       const btnRank  = document.getElementById("btnRank");
       const scoreBox = document.getElementById("scoreBox");
+      const btnRetry = document.getElementById("btnRetry");
       const topBar = document.getElementById("topBar");
-      if (!btnStart || !btnRank || !scoreBox) return;
+      if (!btnStart || !btnRank || !scoreBox || !btnRetry) return;
 
       if (mode === "score") {
         btnStart.style.display = "none";
         btnRank.style.display  = "none";
         scoreBox.style.display = "flex";
+        btnRetry.style.display = "inline-flex";
         if (topBar) topBar.classList.add("compact");
         document.body.classList.add("playing");
       } else {
         scoreBox.style.display = "none";
+        btnRetry.style.display = "none";
         btnStart.style.display = "";
         btnRank.style.display  = "";
         if (topBar) topBar.classList.remove("compact");
@@ -424,7 +486,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       return { type: "miss", pts: 10 };
     }
 
-    // 판정 팝업(이미지)
     const imgJudgePerfect = new Image(); imgJudgePerfect.src = "assets/judge_perfect.png";
     const imgJudgeGood    = new Image(); imgJudgeGood.src    = "assets/good.png";
     const imgJudgeMiss    = new Image(); imgJudgeMiss.src    = "assets/miss.png";
@@ -447,7 +508,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     }
 
     // ==============================
-    // 오디오(카운트다운 틱 + BGM)
+    // 오디오
     // ==============================
     let bgm;
     const BGM_SRC = "assets/bgm_retro.mp3";
@@ -622,7 +683,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     let nextRingIdx = 0;
     let nextSpawnIdx = 0;
 
-    // ✅ 차트 끝(마지막 퍼펙트 시점)
     let lastPerfectMs = 0;
 
     function prepareSpawnList() {
@@ -766,7 +826,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     let gameEnded = false;
     const clearState = { active:false, until:0, backAt:0 };
 
-    function endGameClear(reason="chart_end") {
+    async function endGameClear(reason="chart_end") {
       if (gameEnded) return;
       gameEnded = true;
 
@@ -790,10 +850,11 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
 
       console.log("[CLEAR]", reason, payload);
 
-      if (typeof window.submitScore === "function") {
-        window.submitScore(payload)
-          .then(() => console.log("[submitScore] ok"))
-          .catch(err => console.warn("[submitScore] failed", err));
+      try {
+        await submitScore(payload);
+        console.log("[submitScore] ok");
+      } catch (err) {
+        console.warn("[submitScore] failed", err);
       }
     }
 
@@ -815,11 +876,10 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     let rafId = 0;
     let loopActive = false;
 
-    function startCountdown() {
+    function resetChartRuntime() {
       circles = [];
       rings.clear();
       judgePopups = [];
-
       score = 0;
       setTopScore(0);
 
@@ -827,16 +887,20 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       gameEnded = false;
       clearState.active = false;
 
+      nextRingIdx = 0;
+      nextSpawnIdx = 0;
+
+      if (bgm) { try { bgm.pause(); bgm.currentTime = 0; } catch(e) {} }
+    }
+
+    function startCountdown() {
+      resetChartRuntime();
+
       countdown.active = true;
       countdown.startAt = performance.now();
       countdown.started = false;
       countdown.startShownUntil = 0;
       countdown.tickStage = 0;
-
-      nextRingIdx = 0;
-      nextSpawnIdx = 0;
-
-      if (bgm) { try { bgm.pause(); bgm.currentTime = 0; } catch(e) {} }
     }
 
     function startLoop() {
@@ -965,7 +1029,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
         ctx.restore();
       }
 
-      // ✅ CLEAR 오버레이
+      // CLEAR 오버레이
       if (clearState.active) {
         ctx.save();
         ctx.textAlign = "center";
@@ -980,13 +1044,12 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
         ctx.restore();
 
         if (nowMs >= clearState.backAt) {
-          // 메뉴(입력 화면)로 복귀
-          startGame();
+          startGame(); // 입력 화면으로 복귀
           return;
         }
       }
 
-      // ✅ 차트 종료 감지(마지막 노트 이후 + 여유)
+      // 차트 종료 감지
       if (!gameEnded && isPlaying && !countdown.active) {
         const songMs = Math.max(0, songMsRaw - SYNC_VISUAL_DELAY_MS);
         const doneSpawning = nextSpawnIdx >= spawnList.length;
@@ -1002,6 +1065,57 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     }
 
     // ==============================
+    // UI: 입력 → 시작(입력 없으면 시작 불가)
+    // ==============================
+    function renderInputScreen() {
+      document.getElementById("content").innerHTML = `
+        <div class="input-row">
+          <label for="studentId">학번</label>
+          <input id="studentId" type="text" placeholder="예) 30123" inputmode="numeric" autocomplete="off">
+        </div>
+        <div class="input-row">
+          <label for="name">이름</label>
+          <input id="name" type="text" placeholder="이름을 입력하세요" autocomplete="off">
+        </div>
+        <div class="bar">
+          <button id="btnGo">입력 완료</button>
+        </div>
+        <p class="muted">학번/이름을 입력해야 게임이 시작됩니다.</p>
+      `;
+
+      const idEl = document.getElementById("studentId");
+      const nameEl = document.getElementById("name");
+      const goBtn = document.getElementById("btnGo");
+
+      function validate() {
+        const id = (idEl.value || "").trim();
+        const nm = (nameEl.value || "").trim();
+
+        const okId = id.length > 0;
+        const okNm = nm.length > 0;
+
+        idEl.classList.toggle("invalid", !okId);
+        nameEl.classList.toggle("invalid", !okNm);
+
+        goBtn.disabled = !(okId && okNm);
+        return okId && okNm;
+      }
+
+      idEl.addEventListener("input", validate);
+      nameEl.addEventListener("input", validate);
+
+      goBtn.addEventListener("click", () => {
+        if (!validate()) {
+          alert("학번과 이름을 입력해 주세요.");
+          return;
+        }
+        gameStart();
+      });
+
+      validate();
+    }
+
+    // ==============================
     // 화면 구성
     // ==============================
     function startGame() {
@@ -1010,40 +1124,30 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       setTopBarMode("menu");
 
       isPlaying = false;
-      circles = [];
-      rings.clear();
-      judgePopups = [];
-      gameEnded = false;
-      clearState.active = false;
-
-      score = 0;
-      setTopScore(0);
+      resetChartRuntime();
 
       if (bgm) { try { bgm.pause(); } catch(e) {} }
 
-      document.getElementById("content").innerHTML = `
-        <div class="input-row">
-          <label for="studentId">학번</label>
-          <input id="studentId" type="text" placeholder="예) 30123">
-        </div>
-        <div class="input-row">
-          <label for="name">이름</label>
-          <input id="name" type="text" placeholder="이름을 입력하세요">
-        </div>
-        <div class="bar">
-          <button onclick="gameStart()">입력 완료</button>
-        </div>
-      `;
+      renderInputScreen();
     }
-    window.startGame = startGame;
 
     function gameStart() {
+      // ✅ 입력 검증(혹시 버튼이 강제로 눌려도 막음)
+      const idEl = document.getElementById("studentId");
+      const nameEl = document.getElementById("name");
+      const id = (idEl?.value || "").trim();
+      const name = (nameEl?.value || "").trim();
+      if (!id || !name) {
+        alert("학번과 이름을 입력해 주세요.");
+        if (idEl) idEl.classList.toggle("invalid", !id);
+        if (nameEl) nameEl.classList.toggle("invalid", !name);
+        return;
+      }
+
+      window._player = { id, name };
+
       lockScroll();
       setTopBarMode("score");
-
-      const id = (document.getElementById("studentId").value || "").trim();
-      const name = (document.getElementById("name").value || "").trim();
-      window._player = { id, name };
 
       document.getElementById("content").innerHTML = `<canvas id="gameCanvas"></canvas>`;
 
@@ -1066,29 +1170,136 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
 
       startLoop();
     }
-    window.gameStart = gameStart;
 
-    function showRanking() {
+    // ✅ 플레이 중 다시하기(입력 정보 유지)
+    function retryGame() {
+      if (!gameArea || !ctx) return;
+      placements = parsePlacementsFromCode(PLACEMENT_CODE);
+      prepareSpawnList();
+      startCountdown(); // score/circles/오디오 리셋 + 카운트다운
+      if (!loopActive) startLoop();
+    }
+
+    // ==============================
+    // 랭킹 UI
+    // ==============================
+    function msToTime(ms) {
+      const s = Math.max(0, Math.floor(ms / 1000));
+      const mm = String(Math.floor(s / 60)).padStart(2, "0");
+      const ss = String(s % 60).padStart(2, "0");
+      return `${mm}:${ss}`;
+    }
+
+    async function showRanking() {
       stopLoop();
       unlockScroll();
       setTopBarMode("menu");
 
       isPlaying = false;
-      circles = [];
-      rings.clear();
-      judgePopups = [];
-      gameEnded = false;
-      clearState.active = false;
+      resetChartRuntime();
 
-      if (bgm) { try { bgm.pause(); } catch(e) {} }
+      document.getElementById("content").innerHTML = `
+        <div class="rank-wrap">
+          <div class="rank-head">
+            <strong>랭킹</strong>
+            <div class="rank-actions">
+              <button id="btnRefresh">새로고침</button>
+              <button id="btnBack">메뉴로</button>
+            </div>
+          </div>
+          <div style="padding:12px 14px" class="muted" id="rankStatus">불러오는 중...</div>
+          <div style="overflow:auto">
+            <table class="rank-table" id="rankTable" style="display:none">
+              <thead>
+                <tr>
+                  <th style="width:60px">#</th>
+                  <th>이름</th>
+                  <th style="width:90px">학번</th>
+                  <th style="width:90px">점수</th>
+                  <th style="width:90px">시간</th>
+                </tr>
+              </thead>
+              <tbody id="rankBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <p class="muted">※ Firestore 읽기 권한이 필요합니다.</p>
+      `;
 
-      document.getElementById("content").innerHTML = `<p>랭킹 기능은 추후 추가 예정</p>`;
+      const statusEl = document.getElementById("rankStatus");
+      const tableEl = document.getElementById("rankTable");
+      const bodyEl = document.getElementById("rankBody");
+
+      async function load() {
+        statusEl.textContent = "불러오는 중...";
+        tableEl.style.display = "none";
+        bodyEl.innerHTML = "";
+
+        try {
+          const rows = await fetchTopScores(20);
+          if (!rows.length) {
+            statusEl.textContent = "아직 기록이 없습니다.";
+            return;
+          }
+
+          statusEl.textContent = "";
+          tableEl.style.display = "table";
+
+          rows.forEach((r, i) => {
+            const tr = document.createElement("tr");
+            const nm = (r.name || "").toString();
+            const sid = (r.studentId || "").toString();
+            const sc = Number(r.score || 0);
+            const pt = Number(r.playTimeMs || 0);
+
+            tr.innerHTML = `
+              <td>${i + 1}</td>
+              <td>${escapeHtml(nm)}</td>
+              <td>${escapeHtml(sid)}</td>
+              <td>${sc}</td>
+              <td>${msToTime(pt)}</td>
+            `;
+            bodyEl.appendChild(tr);
+          });
+        } catch (e) {
+          console.warn(e);
+          statusEl.textContent = "랭킹을 불러오지 못했습니다. (권한/네트워크 확인)";
+        }
+      }
+
+      document.getElementById("btnRefresh").addEventListener("click", load);
+      document.getElementById("btnBack").addEventListener("click", startGame);
+
+      await load();
     }
-    window.showRanking = showRanking;
 
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    // ==============================
+    // 노트 생성
+    // ==============================
     function createCircle(x, y, ringKey) {
       circles.push({ x, y, radius: NOTE_START_R, ringKey });
     }
+
+    // ==============================
+    // 상단 버튼 연결
+    // ==============================
+    document.getElementById("btnStart").addEventListener("click", startGame);
+    document.getElementById("btnRank").addEventListener("click", showRanking);
+    document.getElementById("btnRetry").addEventListener("click", retryGame);
+
+    // 전역(혹시 필요할 때)
+    window.startGame = startGame;
+    window.showRanking = showRanking;
+    window.gameStart = gameStart;
     window.createCircle = createCircle;
 
     // 첫 진입
