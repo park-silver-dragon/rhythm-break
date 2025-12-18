@@ -22,22 +22,20 @@
       margin: 0 0 6px;
       padding: 0;
       text-align: center;
-      line-height: 0;  /* ✅ h1 기본 라인 높이 제거 */
-      font-size: 0;    /* ✅ h1 기본 글자 높이 제거 */
+      line-height: 0;
+      font-size: 0;
     }
-
     .logo-box{
       width: min(260px, 46vw);
       aspect-ratio: 1920 / 696;
       margin: 0 auto;
       overflow: visible;
     }
-
     .logo-box img{
       width: 100%;
       height: 100%;
       display: block;
-      object-fit: contain;     /* ✅ 좌우 안 잘림 */
+      object-fit: contain;
       object-position: center;
     }
 
@@ -88,11 +86,6 @@
       touch-action: manipulation; background: transparent;
     }
 
-    @media (min-width: 1024px) {
-      button { padding: 12px 16px; }
-      input[type="text"] { width: 420px; }
-    }
-
     /* ✅ 게임 중 스크롤 방지 */
     body.lock-scroll {
       position: fixed;
@@ -103,7 +96,7 @@
       touch-action: none;
     }
 
-    /* ✅ 게임 중 상단바 얇게(점수 UI 세로 줄이기) */
+    /* ✅ 게임 중 상단바 얇게 */
     .bar.menu.compact button,
     .bar.menu.compact .score-box{
       min-height: 40px;
@@ -131,7 +124,7 @@
 
   <div id="content"></div>
 
-  <!-- 🔥 Firebase / Firestore (점수 저장용 - 나중에 사용) -->
+  <!-- 🔥 Firebase / Firestore -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
     import { getFirestore, collection, addDoc, serverTimestamp }
@@ -161,7 +154,7 @@
 
   <script>
     // ==============================
-    // ✅ 운영용 배치 데이터(개발자모드 제거됨)
+    // ✅ 운영용 배치 데이터
     // ==============================
     const PLACEMENT_CODE = String.raw`
 setTimeout(() => createCircle(280, 436), beatToMs(4));
@@ -357,7 +350,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     let score = 0;
     let circles = [];
 
-    // ✅ 모바일/PC 싱크 보정(모바일에서 노트가 빨라 보이면 숫자를 올리면 됨)
     const IS_MOBILE = matchMedia("(pointer:coarse)").matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const SYNC_VISUAL_DELAY_MS = IS_MOBILE ? 90 : 0;
 
@@ -436,14 +428,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     const imgJudgePerfect = new Image(); imgJudgePerfect.src = "assets/judge_perfect.png";
     const imgJudgeGood    = new Image(); imgJudgeGood.src    = "assets/good.png";
     const imgJudgeMiss    = new Image(); imgJudgeMiss.src    = "assets/miss.png";
-
-    // ✅ 터치 이펙트(별)
-    const imgStar = new Image(); imgStar.src = "assets/star.png";
-    let starPopups = []; // {x,y,img,born,life,size}
-    const STAR_LIFE_MS = 380;
-    function addStarPopup(x, y, size = TARGET * 2) {
-      starPopups.push({ x, y, img: imgStar, born: performance.now(), life: STAR_LIFE_MS, size });
-    }
 
     let judgePopups = []; // {x,y,img,born,life,size}
     const POPUP_LIFE_MS = 450;
@@ -551,8 +535,8 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       if (!gameArea || !ctx) return;
 
       const containerW = gameArea.parentElement.clientWidth;
-
       const aspect = DESIGN_H / DESIGN_W;
+
       let cssW = containerW;
       let cssH = Math.round(cssW * aspect);
 
@@ -638,6 +622,9 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     let nextRingIdx = 0;
     let nextSpawnIdx = 0;
 
+    // ✅ 차트 끝(마지막 퍼펙트 시점)
+    let lastPerfectMs = 0;
+
     function prepareSpawnList() {
       const leadMs = ((TARGET - NOTE_START_R) / GROW_PER_SEC) * 1000;
 
@@ -647,6 +634,8 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
         const ringMs  = Math.max(0, spawnMs - PRE_RING_MS);
         return { x: p.x, y: p.y, ringMs, spawnMs, key: i };
       });
+
+      lastPerfectMs = placements.length ? beatToMs(placements[placements.length - 1].t) : 0;
 
       nextRingIdx = 0;
       nextSpawnIdx = 0;
@@ -697,10 +686,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
 
     function applyJudgeAndRemove(index) {
       const c = circles[index];
-
-      // ✅ 터치한 순간 별 이펙트
-      addStarPopup(c.x, c.y, TARGET * 2);
-
       const j = judge(c.radius);
 
       score += j.pts;
@@ -776,6 +761,43 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     }
 
     // ==============================
+    // CLEAR + 저장
+    // ==============================
+    let gameEnded = false;
+    const clearState = { active:false, until:0, backAt:0 };
+
+    function endGameClear(reason="chart_end") {
+      if (gameEnded) return;
+      gameEnded = true;
+
+      isPlaying = false;
+      countdown.active = false;
+
+      try { if (bgm) bgm.pause(); } catch(e) {}
+
+      const now = performance.now();
+      clearState.active = true;
+      clearState.until = now + 1600;
+      clearState.backAt = now + 2200;
+
+      const p = window._player || {};
+      const payload = {
+        studentId: (p.id || "").trim(),
+        name: (p.name || "").trim(),
+        score,
+        playTimeMs: Math.round(getSongMsRaw())
+      };
+
+      console.log("[CLEAR]", reason, payload);
+
+      if (typeof window.submitScore === "function") {
+        window.submitScore(payload)
+          .then(() => console.log("[submitScore] ok"))
+          .catch(err => console.warn("[submitScore] failed", err));
+      }
+    }
+
+    // ==============================
     // 카운트다운 / 루프
     // ==============================
     const countdown = {
@@ -797,12 +819,13 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       circles = [];
       rings.clear();
       judgePopups = [];
-      starPopups = [];
 
       score = 0;
       setTopScore(0);
 
       isPlaying = false;
+      gameEnded = false;
+      clearState.active = false;
 
       countdown.active = true;
       countdown.startAt = performance.now();
@@ -843,7 +866,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       bgX3 = drawScrollingLayer(bgNear, bgX3, bgSpeed3, dtSec);
       bgX4 = drawScrollingLayer(bgBlack,bgX4, bgSpeed4, dtSec);
 
-      // 카운트다운 + 틱(3/2/1과 동시에)
+      // 카운트다운 + 틱
       if (countdown.active) {
         const t = now - countdown.startAt;
 
@@ -870,7 +893,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
             circles = [];
             rings.clear();
             judgePopups = [];
-            starPopups = [];
             nextRingIdx = 0;
             nextSpawnIdx = 0;
 
@@ -900,20 +922,16 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       }
 
       // 오디오 기준 스폰
-      if (isPlaying) {
-        updateSpawnsBySong(getSongMsRaw());
-      }
+      const songMsRaw = getSongMsRaw();
+      if (isPlaying) updateSpawnsBySong(songMsRaw);
 
       // 퍼펙트 링
-      for (const r of rings.values()) {
-        drawPerfectRingAt(r.x, r.y);
-      }
+      for (const r of rings.values()) drawPerfectRingAt(r.x, r.y);
 
       // 노트 업데이트/그리기
       const grow = GROW_PER_SEC * dtSec;
       for (const c of circles) {
         c.radius += grow;
-
         if (imgNote.complete && imgNote.naturalWidth > 0) {
           const size = c.radius * 2;
           ctx.drawImage(imgNote, c.x - c.radius, c.y - c.radius, size, size);
@@ -933,16 +951,13 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
         }
       }
 
-      // ✅ 여기서 nowMs를 "한 번만" 선언해서 별/판정 둘 다 씀 (버그 해결 핵심)
+      // 판정 팝업
       const nowMs = performance.now();
-
-      // ✅ 별 팝업
-      starPopups = starPopups.filter(p => nowMs - p.born < p.life);
-      for (const p of starPopups) {
-        if (!p.img.complete || p.img.naturalWidth === 0) continue;
-
+      judgePopups = judgePopups.filter(p => nowMs - p.born < p.life);
+      for (const p of judgePopups) {
         const t = (nowMs - p.born) / p.life;
         const a = 1 - t;
+        if (!p.img.complete || p.img.naturalWidth === 0) continue;
 
         ctx.save();
         ctx.globalAlpha = a;
@@ -950,18 +965,37 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
         ctx.restore();
       }
 
-      // 판정 팝업(맨 위)
-      judgePopups = judgePopups.filter(p => nowMs - p.born < p.life);
-      for (const p of judgePopups) {
-        const t = (nowMs - p.born) / p.life;
-        const a = 1 - t;
-
-        if (!p.img.complete || p.img.naturalWidth === 0) continue;
-
+      // ✅ CLEAR 오버레이
+      if (clearState.active) {
         ctx.save();
-        ctx.globalAlpha = a;
-        ctx.drawImage(p.img, p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "rgba(255,255,255,0.95)";
+        ctx.shadowColor = "rgba(0,0,0,0.75)";
+        ctx.shadowBlur = 18;
+        ctx.font = "900 140px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+        ctx.fillText("CLEAR", CENTER_X(), CENTER_Y() - 20);
+        ctx.font = "800 54px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+        ctx.fillText(`SCORE ${score}`, CENTER_X(), CENTER_Y() + 90);
         ctx.restore();
+
+        if (nowMs >= clearState.backAt) {
+          // 메뉴(입력 화면)로 복귀
+          startGame();
+          return;
+        }
+      }
+
+      // ✅ 차트 종료 감지(마지막 노트 이후 + 여유)
+      if (!gameEnded && isPlaying && !countdown.active) {
+        const songMs = Math.max(0, songMsRaw - SYNC_VISUAL_DELAY_MS);
+        const doneSpawning = nextSpawnIdx >= spawnList.length;
+        const noNotes = circles.length === 0;
+        const END_GRACE_MS = 1800;
+
+        if (doneSpawning && noNotes && songMs >= lastPerfectMs + END_GRACE_MS) {
+          endGameClear("chart_end");
+        }
       }
 
       rafId = requestAnimationFrame(updateGame);
@@ -979,7 +1013,9 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       circles = [];
       rings.clear();
       judgePopups = [];
-      starPopups = [];
+      gameEnded = false;
+      clearState.active = false;
+
       score = 0;
       setTopScore(0);
 
@@ -1009,9 +1045,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       const name = (document.getElementById("name").value || "").trim();
       window._player = { id, name };
 
-      document.getElementById("content").innerHTML = `
-        <canvas id="gameCanvas"></canvas>
-      `;
+      document.getElementById("content").innerHTML = `<canvas id="gameCanvas"></canvas>`;
 
       gameArea = document.getElementById("gameCanvas");
       ctx = gameArea.getContext("2d");
@@ -1043,7 +1077,8 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       circles = [];
       rings.clear();
       judgePopups = [];
-      starPopups = [];
+      gameEnded = false;
+      clearState.active = false;
 
       if (bgm) { try { bgm.pause(); } catch(e) {} }
 
