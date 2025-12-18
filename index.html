@@ -26,8 +26,9 @@
       width: 100%; max-width: var(--max-width);
       display: flex; justify-content: center; gap: 12px;
     }
+
     .bar.menu { flex-wrap: nowrap; }
-    .bar.menu > button { flex: 1 1 0; min-width: 0; }
+    .bar.menu > button, .bar.menu > .score-box { flex: 1 1 0; min-width: 0; }
 
     button {
       font-size: clamp(16px, 4.5vw, 18px);
@@ -36,6 +37,19 @@
       box-shadow: 0 1px 0 rgba(0,0,0,0.06); cursor: pointer; color:#fff;
     }
     button:active { transform: translateY(1px); }
+
+    .score-box{
+      display:none;
+      align-items:center;
+      justify-content:center;
+      font-size: clamp(16px, 4.5vw, 18px);
+      padding: 14px 18px; min-height: 48px;
+      border-radius: 12px; border: 1px solid #222; background:#0b0b0b;
+      font-weight: 900;
+      color:#fff;
+      user-select:none;
+    }
+    .score-box span{ margin-left:8px; }
 
     #content { width: 100%; max-width: var(--max-width); margin-top: 12px; }
 
@@ -47,12 +61,18 @@
       width: min(420px, 80vw);
       border: 1.2px solid #222; border-radius: 10px; background: #0b0b0b; color:#fff;
     }
+
     p { margin: 10px 0; font-size: clamp(15px, 4.2vw, 17px); text-align:center; color:#ddd; }
 
     canvas {
       width: 100%; max-height: 85vh;
       display: block; margin: 0 auto; border: 1px solid #222;
       touch-action: manipulation; background: transparent;
+    }
+
+    @media (min-width: 1024px) {
+      button { padding: 12px 16px; }
+      input[type="text"] { width: 420px; }
     }
 
     /* ✅ 게임 중 스크롤 방지 */
@@ -70,9 +90,10 @@
 <body>
   <h1>🎵 리듬게임 🎵</h1>
 
-  <div class="bar menu">
-    <button onclick="startGame()">게임 시작</button>
-    <button onclick="showRanking()">랭킹 확인</button>
+  <div class="bar menu" id="topBar">
+    <button id="btnStart" onclick="startGame()">게임 시작</button>
+    <button id="btnRank" onclick="showRanking()">랭킹 확인</button>
+    <div class="score-box" id="scoreBox">점수 <span id="scoreTop">0</span></div>
   </div>
 
   <div id="content"></div>
@@ -303,10 +324,9 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     let score = 0;
     let circles = [];
 
-    // ✅ 모바일이 “화면이 더 빠르게” 느껴지면 여기만 올려서 보정(60~120 추천)
+    // ✅ 기기별 싱크 보정 (PC는 0, 모바일만 +값)
     const IS_MOBILE = matchMedia("(pointer:coarse)").matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const SYNC_VISUAL_DELAY_MS = IS_MOBILE ? 90 : 0;
-
 
     // ===== 스크롤 잠금/해제 =====
     let savedScrollY = 0;
@@ -322,7 +342,30 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       window.scrollTo(0, y);
     }
 
-    // ===== 논리 좌표(디자인 해상도) — 9:16 =====
+    // ===== 상단바 모드 전환 =====
+    function setTopBarMode(mode) {
+      const btnStart = document.getElementById("btnStart");
+      const btnRank  = document.getElementById("btnRank");
+      const scoreBox = document.getElementById("scoreBox");
+      if (!btnStart || !btnRank || !scoreBox) return;
+
+      if (mode === "score") {
+        btnStart.style.display = "none";
+        btnRank.style.display = "none";
+        scoreBox.style.display = "flex";
+      } else {
+        scoreBox.style.display = "none";
+        btnStart.style.display = "";
+        btnRank.style.display = "";
+      }
+    }
+
+    function setTopScore(v) {
+      const el = document.getElementById("scoreTop");
+      if (el) el.textContent = String(v);
+    }
+
+    // ===== 논리 좌표 =====
     const DESIGN_W = 540;
     const DESIGN_H = 960;
     const CENTER_X = () => DESIGN_W / 2;
@@ -339,7 +382,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     const PERFECT_WINDOW = 6;
     const PERFECT_MIN = TARGET - PERFECT_WINDOW;
     const PERFECT_MAX = TARGET + PERFECT_WINDOW;
-
     const TOUCH_HIT_RADIUS = 40;
 
     let lastFrameAt = 0;
@@ -354,7 +396,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     // ==============================
     let bgm;
     const BGM_SRC = "assets/bgm_retro.mp3";
-
     const SFX_TICK_SRC = "assets/kick.mp3";
 
     function primeBgm() {
@@ -398,7 +439,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       return Math.max(0, t * 1000);
     }
 
-    // ===== 배치 파싱 → placements =====
+    // ===== 배치 파싱 =====
     let placements = []; // {x,y,t(beat), idx}
     function parsePlacementsFromCode(code) {
       const out = [];
@@ -485,10 +526,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     const bgBlack = new Image(); bgBlack.src = "assets/bg_city_black.png";
 
     let bgX1 = 0, bgX2 = 0, bgX3 = 0, bgX4 = 0;
-    const bgSpeed1 = 8;
-    const bgSpeed2 = 18;
-    const bgSpeed3 = 30;
-    const bgSpeed4 = 42;
+    const bgSpeed1 = 8, bgSpeed2 = 18, bgSpeed3 = 30, bgSpeed4 = 42;
 
     // ==============================
     // 4) 캔버스 스케일링
@@ -586,15 +624,13 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
 
       const c = circles[bestIdx];
       score += judgeRadius(c.radius);
-      const scoreEl = document.getElementById("score");
-      if (scoreEl) scoreEl.innerText = score;
+      setTopScore(score);
       circles.splice(bestIdx, 1);
     }
 
     function onKeyDown(e) {
       if (e.code !== "Space") return;
       if (!isPlaying) return;
-      // Space는 중앙 근처를 친 것으로 처리(원래 로직 유지하고 싶으면 여기 바꾸면 됨)
       attemptHitNearest(CENTER_X(), CENTER_Y());
     }
 
@@ -610,6 +646,22 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     function onPointerDown(e) {
       const { x, y } = screenToLogical(e.clientX, e.clientY);
       attemptHitNearest(x, y);
+    }
+
+    // 리스너 중복 방지
+    let keyBound = false;
+    let resizeBound = false;
+
+    function bindKeyOnce() {
+      if (keyBound) return;
+      keyBound = true;
+      document.addEventListener("keydown", onKeyDown, { passive: true });
+    }
+    function bindResizeOnce() {
+      if (resizeBound) return;
+      resizeBound = true;
+      window.addEventListener("resize", resizeCanvas);
+      window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
     }
 
     // ==============================
@@ -635,8 +687,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       circles = [];
       prePerfectRings = [];
       score = 0;
-      const scoreEl = document.getElementById("score");
-      if (scoreEl) scoreEl.innerText = "0";
+      setTopScore(0);
 
       isPlaying = false;
 
@@ -741,7 +792,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
         const songMsRaw = getSongMs();
         updateSpawnsBySong(songMsRaw);
 
-        // 미리 링 만료(오디오 기준)
         const songMsEff = Math.max(0, songMsRaw - SYNC_VISUAL_DELAY_MS);
         prePerfectRings = prePerfectRings.filter(r => r.untilSongMs > songMsEff);
         for (const r of prePerfectRings) drawPerfectRingAt(r.x, r.y, 1.0);
@@ -764,22 +814,10 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
         }
       });
 
-      // 노트 위에 퍼펙트 링(항상 동일 렌더)
+      // 노트 위 퍼펙트 링
       for (const c of circles) drawPerfectRingAt(c.x, c.y, 1.0);
 
       circles = circles.filter(c => c.radius <= 85);
-
-      // 우측 상단: song time
-      if (isPlaying) {
-        const songMs = Math.max(0, getSongMs() - SYNC_VISUAL_DELAY_MS);
-        ctx.save();
-        ctx.fillStyle = "white";
-        ctx.textAlign = "right";
-        ctx.textBaseline = "top";
-        ctx.font = `${Math.max(12, Math.floor(14 / view.scale))}px sans-serif`;
-        ctx.fillText(`t=${(songMs/1000).toFixed(2)}s`, DESIGN_W - 8, 8);
-        ctx.restore();
-      }
 
       rafId = requestAnimationFrame(updateGame);
     }
@@ -790,12 +828,14 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     function startGame() {
       stopLoop();
       unlockScroll();
+      setTopBarMode("menu");
 
       isPlaying = false;
       countdown.active = false;
-
       circles = [];
       prePerfectRings = [];
+      score = 0;
+      setTopScore(0);
 
       if (bgm) { try { bgm.pause(); } catch(e) {} }
 
@@ -817,13 +857,13 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
 
     function gameStart() {
       lockScroll();
+      setTopBarMode("score");
 
       const id = (document.getElementById("studentId").value || "").trim();
       const name = (document.getElementById("name").value || "").trim();
 
       document.getElementById("content").innerHTML = `
         <canvas id="gameCanvas"></canvas>
-        <p>점수: <span id="score">0</span></p>
         <p>${id} ${name} 님, (모바일: 터치 / PC: Space)</p>
       `;
 
@@ -833,13 +873,11 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       resizeCanvas();
 
       // 리스너
-      document.addEventListener("keydown", onKeyDown, { passive: true });
+      bindKeyOnce();
       gameArea.addEventListener("pointerdown", onPointerDown, { passive: true });
+      bindResizeOnce();
 
-      window.addEventListener("resize", resizeCanvas);
-      window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
-
-      // 배치 로드(운영용)
+      // 배치 로드
       placements = parsePlacementsFromCode(PLACEMENT_CODE);
       prepareSpawnList();
 
@@ -855,10 +893,10 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     function showRanking() {
       stopLoop();
       unlockScroll();
+      setTopBarMode("menu");
 
       isPlaying = false;
       countdown.active = false;
-
       circles = [];
       prePerfectRings = [];
 
@@ -881,5 +919,3 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
   </script>
 </body>
 </html>
-
-
