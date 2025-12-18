@@ -17,10 +17,23 @@
     }
     body { display: flex; flex-direction: column; align-items: center; padding: 16px; }
 
-    h1 {
-      margin: 12px 0 10px; line-height: 1.2; font-weight: 900;
-      font-size: clamp(24px, 7vw, 40px); letter-spacing: -0.02em; text-align: center;
-    }
+    h1.title-logo{
+  margin: 12px 0 10px;
+  line-height: 1;
+  text-align: center;
+  font-weight: 900;
+}
+
+h1.title-logo img{
+  width: min(520px, 92vw);
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  image-rendering: auto;
+}
+
+/* 게임 중 위 여백 줄이는 옵션 유지 */
+body.playing h1.title-logo { margin: 8px 0 6px; }
 
     .bar {
       width: 100%; max-width: var(--max-width);
@@ -100,7 +113,10 @@
 </head>
 
 <body>
-  <h1>🎵 리듬게임 🎵</h1>
+   <h1 class="title-logo">
+    <img src="assets/logo.png" alt="RHYTHM BREAK 로고">
+  </h1>
+
 
   <div class="bar menu" id="topBar">
     <button id="btnStart" onclick="startGame()">게임 시작</button>
@@ -986,3 +1002,4 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
   </script>
 </body>
 </html>
+
