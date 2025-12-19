@@ -1391,12 +1391,11 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
             const pt = Number(r.playTimeMs || 0);
 
             tr.innerHTML = `
-              <td>${i + 1}</td>
-              <td>${escapeHtml(nm)}</td>
-              <td>${escapeHtml(sid)}</td>
-              <td>${sc}</td>
-              <td>${msToTime(pt)}</td>
-            `;
+  <td>${i + 1}</td>
+  <td>${escapeHtml(nm)}</td>
+  <td>${escapeHtml(sid)}</td>
+  <td>${sc}</td>
+`;
             bodyEl.appendChild(tr);
           });
         } catch (e) {
@@ -1445,6 +1444,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
   </script>
 </body>
 </html>
+
 
 
 
