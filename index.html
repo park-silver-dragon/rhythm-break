@@ -76,21 +76,6 @@
       display:none;
       flex: 0 0 auto;
     }
-    #lastTouchBox{
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      padding: 6px 12px;
-      border-radius: 10px;
-      border: 1px solid #222;
-      background: rgba(11,11,11,0.85);
-      font-size: 16px;
-      font-weight: 800;
-      z-index: 40;
-      display: none;
-      pointer-events: none;
-    }
-    #lastTouchBox span{ display: inline-block; min-width: 20px; text-align: center; }
 
     #content { width: 100%; max-width: var(--max-width); margin-top: 12px; }
 
@@ -265,7 +250,6 @@
     <div class="score-box" id="scoreBox">점수 <span id="scoreTop">0</span></div>
     <button id="btnRetry">다시하기</button>
   </div>
-  <div id="lastTouchBox"><span id="lastTouchIdx">-</span></div>
 
   <div id="content"></div>
 
@@ -588,7 +572,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       const scoreBox = document.getElementById("scoreBox");
       const btnRetry = document.getElementById("btnRetry");
       const topBar = document.getElementById("topBar");
-      const lastTouchBox = document.getElementById("lastTouchBox");
       if (!btnStart || !btnRank || !scoreBox || !btnRetry) return;
 
       if (mode === "score") {
@@ -598,7 +581,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
         btnRetry.style.display = "inline-flex";
         if (topBar) topBar.classList.add("compact");
         document.body.classList.add("playing");
-        if (lastTouchBox) lastTouchBox.style.display = "block";
       } else {
         scoreBox.style.display = "none";
         btnRetry.style.display = "none";
@@ -606,7 +588,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
         btnRank.style.display  = "";
         if (topBar) topBar.classList.remove("compact");
         document.body.classList.remove("playing");
-        if (lastTouchBox) lastTouchBox.style.display = "none";
       }
     }
     function setTopScore(v) {
@@ -616,13 +597,6 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     let lastTouchIdx = null;
     function setLastTouchIndex(idx) {
       lastTouchIdx = idx;
-      const el = document.getElementById("lastTouchIdx");
-      if (!el) return;
-      if (idx === null || idx === undefined || Number.isNaN(idx)) {
-        el.textContent = "-";
-        return;
-      }
-      el.textContent = String(idx);
     }
 
     // ==============================
