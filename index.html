@@ -594,6 +594,10 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       const el = document.getElementById("scoreTop");
       if (el) el.textContent = String(v);
     }
+    let lastTouchIdx = null;
+    function setLastTouchIndex(idx) {
+      lastTouchIdx = idx;
+    }
 
     // ==============================
     // 논리 좌표 / 박자
@@ -892,6 +896,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
 
       score += j.pts;
       setTopScore(score);
+      setLastTouchIndex(c.ringKey);
 
       addJudgePopup(j.type, c.x, c.y);
       removeCircleAt(index);
@@ -1035,6 +1040,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       judgePopups = [];
       score = 0;
       setTopScore(0);
+      setLastTouchIndex(null);
 
       isPlaying = false;
       gameEnded = false;
@@ -1179,6 +1185,20 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
         ctx.save();
         ctx.globalAlpha = a;
         ctx.drawImage(p.img, p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+        ctx.restore();
+      }
+
+      // 마지막으로 터치한 타일 표시
+      if (document.body.classList.contains("playing")) {
+        ctx.save();
+        ctx.textAlign = "right";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.shadowColor = "rgba(0,0,0,0.65)";
+        ctx.shadowBlur = 8;
+        ctx.font = "800 26px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+        const label = `${lastTouchIdx ?? "-"}`;
+        ctx.fillText(label, DESIGN_W - 16, 12);
         ctx.restore();
       }
 
