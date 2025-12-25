@@ -161,6 +161,78 @@
       font-weight: 800;
     }
     .muted{ color:#aaa; font-size: 13px; }
+
+    /* ✅ 개발자 모드 */
+    .dev-toggle {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 50;
+      padding: 10px 14px;
+      font-size: 14px;
+      border-radius: 10px;
+      background: rgba(20, 20, 20, 0.9);
+      border: 1px solid #333;
+    }
+    .dev-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px 16px;
+      z-index: 100;
+    }
+    .dev-overlay.active { display: flex; }
+    .dev-panel {
+      width: min(900px, 96vw);
+      background: #0c0c0c;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+      display: grid;
+      gap: 12px;
+    }
+    .dev-panel header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .dev-panel h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+    .dev-panel textarea {
+      width: 100%;
+      min-height: 220px;
+      resize: vertical;
+      border-radius: 10px;
+      border: 1px solid #222;
+      background: #050505;
+      color: #fff;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+    }
+    .dev-list {
+      max-height: 220px;
+      overflow: auto;
+      border: 1px solid #1c1c1c;
+      border-radius: 10px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      background: #060606;
+      color: #bfbfbf;
+    }
+    .dev-hint {
+      font-size: 12px;
+      color: #9a9a9a;
+    }
   </style>
 </head>
 
@@ -180,6 +252,23 @@
   </div>
 
   <div id="content"></div>
+
+  <button id="btnDevToggle" class="dev-toggle" type="button">개발자 모드</button>
+  <div id="devOverlay" class="dev-overlay" aria-hidden="true">
+    <div class="dev-panel" role="dialog" aria-modal="true" aria-label="개발자 모드 패널">
+      <header>
+        <h2>개발자 모드</h2>
+        <button id="btnDevClose" type="button">닫기</button>
+      </header>
+      <div class="dev-hint">단축키: Ctrl + Shift + D</div>
+      <textarea id="devPlacementCode" spellcheck="false"></textarea>
+      <div class="bar">
+        <button id="btnApplyPlacement" type="button">적용</button>
+      </div>
+      <div class="dev-hint">파싱 결과 (idx / x / y / t)</div>
+      <div id="devPlacementList" class="dev-list"></div>
+    </div>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
@@ -873,6 +962,17 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 50));
     }
 
+    let devKeyBound = false;
+    function bindDevKeyOnce() {
+      if (devKeyBound) return;
+      devKeyBound = true;
+      document.addEventListener("keydown", (e) => {
+        if (!(e.ctrlKey && e.shiftKey && e.code === "KeyD")) return;
+        e.preventDefault();
+        toggleDevOverlay();
+      });
+    }
+
     // ==============================
     // CLEAR + 저장
     // ==============================
@@ -1270,6 +1370,50 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       renderInputScreen();
     }
 
+    let placementCode = PLACEMENT_CODE;
+    let devOverlayActive = false;
+
+    function renderDevPlacementList(list) {
+      const listEl = document.getElementById("devPlacementList");
+      if (!listEl) return;
+      if (!list.length) {
+        listEl.textContent = "파싱된 항목이 없습니다.";
+        return;
+      }
+      listEl.textContent = list
+        .map((p) => `${p.idx} / ${p.x} / ${p.y} / ${p.t}`)
+        .join("\n");
+    }
+
+    function syncDevPanel() {
+      const textarea = document.getElementById("devPlacementCode");
+      if (textarea) textarea.value = placementCode;
+      renderDevPlacementList(parsePlacementsFromCode(placementCode));
+    }
+
+    function setDevOverlayActive(active) {
+      devOverlayActive = active;
+      const overlay = document.getElementById("devOverlay");
+      if (overlay) {
+        overlay.classList.toggle("active", active);
+        overlay.setAttribute("aria-hidden", String(!active));
+      }
+      if (active) syncDevPanel();
+    }
+
+    function toggleDevOverlay() {
+      setDevOverlayActive(!devOverlayActive);
+    }
+
+    function applyPlacementCode() {
+      const textarea = document.getElementById("devPlacementCode");
+      if (!textarea) return;
+      placementCode = textarea.value;
+      placements = parsePlacementsFromCode(placementCode);
+      prepareSpawnList();
+      renderDevPlacementList(placements);
+    }
+
     function gameStart() {
       // ✅ 입력 검증(혹시 버튼이 강제로 눌려도 막음)
       const idEl = document.getElementById("studentId");
@@ -1297,7 +1441,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
       gameArea.addEventListener("pointerdown", onPointerDown, { passive: true });
       bindResizeOnce();
 
-      placements = parsePlacementsFromCode(PLACEMENT_CODE);
+      placements = parsePlacementsFromCode(placementCode);
       prepareSpawnList();
 
       primeBgm();
@@ -1313,7 +1457,7 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     // ✅ 플레이 중 다시하기(입력 정보 유지)
     function retryGame() {
       if (!gameArea || !ctx) return;
-      placements = parsePlacementsFromCode(PLACEMENT_CODE);
+      placements = parsePlacementsFromCode(placementCode);
       prepareSpawnList();
       startCountdown(); // score/circles/오디오 리셋 + 카운트다운
       if (!loopActive) startLoop();
@@ -1432,6 +1576,13 @@ setTimeout(() => createCircle(386, 315), beatToMs(208));
     document.getElementById("btnStart").addEventListener("click", startGame);
     document.getElementById("btnRank").addEventListener("click", showRanking);
     document.getElementById("btnRetry").addEventListener("click", retryGame);
+    document.getElementById("btnDevToggle").addEventListener("click", () => setDevOverlayActive(true));
+    document.getElementById("btnDevClose").addEventListener("click", () => setDevOverlayActive(false));
+    document.getElementById("btnApplyPlacement").addEventListener("click", applyPlacementCode);
+    document.getElementById("devOverlay").addEventListener("click", (e) => {
+      if (e.target.id === "devOverlay") setDevOverlayActive(false);
+    });
+    bindDevKeyOnce();
 
     // 전역(혹시 필요할 때)
     window.startGame = startGame;
