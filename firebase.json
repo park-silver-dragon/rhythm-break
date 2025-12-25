@@ -1,8 +1,14 @@
 {
   "hosting": {
-    "public": "public",
-    "rewrites": [
-      { "source": "**", "destination": "/maintenance.html" }
+    "public": "./",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      ".github",
+      "README.md",
+      "package.json",
+      "package-lock.json"
     ]
   }
 }
